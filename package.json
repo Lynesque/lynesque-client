@@ -1,0 +1,17 @@
+{
+  "name": "lynesque-client",
+  "version": "0.2.0",
+  "private": true,
+  "workspaces": [
+    "apps/client",
+    "apps/desktop"
+  ],
+  "scripts": {
+    "friend": "concurrently -k -n client,desktop \"npm run dev:client\" \"npm run dev:desktop\"",
+    "dev:client": "npm --workspace @lynesque/client run dev",
+    "dev:desktop": "npm --workspace @lynesque/desktop run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
