@@ -1,4 +1,4 @@
-import type { AssetRecord, Notification, Post, Profile, Scene, User } from './types';
+import type { AssetRecord, BoardPost, Notification, Post, Profile, Scene, User } from './types';
 
 const queryApi = new URLSearchParams(window.location.search).get('api');
 export const defaultApiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:'
@@ -54,11 +54,19 @@ export async function getPost(apiBase: string, token: string, postId: string) {
   return parse<{ post: Post; offset: number; total: number }>(await fetch(`${apiBase}/api/posts/${encodeURIComponent(postId)}`, { headers: authHeaders(token) }));
 }
 
-export async function createPost(apiBase: string, token: string, scene: Scene) {
+export async function createPost(apiBase: string, token: string, scene: Scene, title = 'New Video') {
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts`, {
-    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ scene })
+    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ scene, title })
   }));
 }
+export async function searchVideos(apiBase: string, token: string, query: string) { return parse<{ posts: Post[] }>(await fetch(`${apiBase}/api/search/videos?q=${encodeURIComponent(query)}`, { headers: authHeaders(token) })); }
+export async function getBoardPosts(apiBase: string, token: string) { return parse<{ posts: BoardPost[] }>(await fetch(`${apiBase}/api/postboard`, { headers: authHeaders(token) })); }
+export async function createBoardPost(apiBase: string, token: string, text: string, stickerAssetId?: string) { return parse<{ post: BoardPost }>(await fetch(`${apiBase}/api/postboard`, {method:'POST',headers:authHeaders(token,true),body:JSON.stringify({text,stickerAssetId})})); }
+export async function toggleBoardReaction(apiBase:string,token:string,id:string,reaction:'like'|'dislike'){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/postboard/${id}/${reaction}`,{method:'POST',headers:authHeaders(token)}));}
+export async function addBoardComment(apiBase:string,token:string,id:string,text:string,stickerAssetId?:string){return parse<{comment:unknown}>(await fetch(`${apiBase}/api/postboard/${id}/comments`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({text,stickerAssetId})}));}
+export async function toggleBoardCommentReaction(apiBase:string,token:string,id:string,commentId:string,reaction:'like'|'dislike'){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/postboard/${id}/comments/${commentId}/${reaction}`,{method:'POST',headers:authHeaders(token)}));}
+export async function getBoardNotifications(apiBase:string,token:string){return parse<{notifications:Notification[];unreadCount:number}>(await fetch(`${apiBase}/api/postboard/notifications`,{headers:authHeaders(token)}));}
+export async function markBoardNotificationsRead(apiBase:string,token:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/postboard/notifications/read`,{method:'POST',headers:authHeaders(token)}));}
 
 export async function toggleLike(apiBase: string, token: string, postId: string) {
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts/${postId}/like`, { method: 'POST', headers: authHeaders(token) }));

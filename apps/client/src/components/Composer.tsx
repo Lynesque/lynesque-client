@@ -29,6 +29,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
   const [endpoint, setEndpoint] = useState<0 | 1>(0);
   const [status, setStatus] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(false);
+  const [title, setTitle] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const timeline = useTimeline(7);
 
@@ -115,9 +116,10 @@ export function Composer({ apiBase, token, onPosted }: Props) {
     if (!scene.layers.length) return setStatus('Put something in the video first.');
     setStatus('Posting...');
     try {
-      await createPost(apiBase, token, scene);
+      await createPost(apiBase, token, scene, title || 'New Video');
       setStatus('Video published.');
       setScene({ version: 1, duration: 7, background: '#000000', layers: [] });
+      setTitle('');
       setSelectedId(null);
       timeline.seek(0);
       timeline.setPlaying(false);
@@ -136,6 +138,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
           <button className={libraryVisible ? 'active' : ''} onClick={() => setLibraryVisible((visible) => !visible)}>Library</button>
           <button onClick={addText}>Add text</button>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
+          <input className="video-title" value={title} maxLength={180} onChange={(event) => setTitle(event.target.value)} placeholder="Video title — #hashtags and @people work" />
           <button className="primary" onClick={publish}>Publish video</button>
         </div>
 

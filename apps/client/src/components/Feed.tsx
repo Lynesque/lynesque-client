@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addComment, getFeed, getPost, mediaUrl, runShitTok, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
+import { addComment, getFeed, getPost, mediaUrl, runShitTok, searchVideos, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { AssetRecord, Post, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
@@ -12,8 +12,8 @@ function Avatar({ apiBase, user, small = false }: { apiBase: string; user?: User
   </span>;
 }
 
-function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile }: {
-  apiBase: string; token: string; viewerId: string; post: Post; onPost: (post: Post) => void; onProfile: (id: string) => void;
+function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile, onHash }: {
+  apiBase: string; token: string; viewerId: string; post: Post; onPost: (post: Post) => void; onProfile: (id: string) => void; onHash: (tag: string) => void;
 }) {
   const timeline = useTimeline(7);
   const [comment, setComment] = useState('');
@@ -34,6 +34,7 @@ function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile }: {
         </div>
         <span>{new Date(post.createdAt).toLocaleString()}</span>
       </div>
+      <h2 className="video-post-title">{post.title.split(/(#[a-zA-Z0-9_-]+)/g).map((part,index)=>part.startsWith('#')?<button className="text-link" key={index} onClick={()=>onHash(part)}>{part}</button>:part)}</h2>
       <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>
         <SceneCanvas scene={post.scene} time={timeline.time} playing={timeline.playing} apiBase={apiBase} />
         {!timeline.playing && <div className="play-overlay">▶</div>}
@@ -44,6 +45,7 @@ function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile }: {
         <button className={post.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleDislike(apiBase, token, post.id)).post)}>▼</button>
         <button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button>
         <button className={commentsVisible ? 'active' : ''} onClick={() => setCommentsVisible((visible) => !visible)}>{post.commentCount} comments</button>
+        <span>{post.viewCount} views</span>
       </div>
     </article>
     {commentsVisible && <aside className="comments-panel panel">
@@ -93,6 +95,7 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
   const [status, setStatus] = useState('');
   const [videoNumber, setVideoNumber] = useState('1');
   const [notificationsVisible, setNotificationsVisible] = useState(true);
+  const [search, setSearch] = useState(() => localStorage.getItem('lynesque-search') || '');
 
   const load = async (nextOffset: number) => {
     try {
@@ -120,19 +123,22 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
     }
   };
 
-  useEffect(() => { initialPostId ? openPost(initialPostId) : load(0); }, [apiBase, token, refreshToken, initialPostId]);
+  useEffect(() => { const pending = localStorage.getItem('lynesque-search'); if (pending) { setSearch(pending); runSearch(pending); } else if (initialPostId) openPost(initialPostId); else load(0); }, [apiBase, token, refreshToken, initialPostId]);
 
   const jumpToVideo = () => {
     const number = Math.max(1, Math.min(total, Math.floor(Number(videoNumber) || 1)));
     setVideoNumber(String(number));
     load(number - 1);
   };
+  const runSearch = async (value = search) => { const result = await searchVideos(apiBase, token, value); setPost(result.posts[0] || null); setTotal(result.posts.length); setOffset(0); setVideoNumber('1'); localStorage.removeItem('lynesque-search'); setStatus(result.posts.length ? `Search: ${value}` : 'No videos matched that search.'); };
+  const hashtag = (tag: string) => { setSearch(tag); runSearch(tag); };
 
   return (
     <div className={`feed-page ${notificationsVisible ? 'with-notifications' : ''}`}>
       {notificationsVisible ? <Notifications apiBase={apiBase} token={token} onUnreadCount={onUnreadCount} onOpenPost={openPost} onProfile={onProfile} onHide={() => setNotificationsVisible(false)} /> : <button className="show-notifications" onClick={() => setNotificationsVisible(true)}>Show notifications</button>}
       <div className="feed-main">
       <div className="feed-tools panel">
+        <form className="video-search" onSubmit={(event)=>{event.preventDefault();runSearch();}}><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Search titles or #hashtags"/><button>Search</button></form>
         {total ? <form className="video-jump" onSubmit={(event) => { event.preventDefault(); jumpToVideo(); }}>
           <span>Video</span><input aria-label="Video number" type="number" min="1" max={total} value={videoNumber} onChange={(event) => setVideoNumber(event.target.value)} /><span>of {total}</span><button type="submit">Go</button>
         </form> : <span>No videos yet.</span>}
@@ -142,7 +148,7 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
         {user.id === 'lynesque' && <button onClick={async () => { const result = await runShitTok(apiBase, token); setStatus(`shit-tok: ${JSON.stringify(result)}`); await load(0); }}>Run shit-tok</button>}
       </div>
       {status && <div className="status">{status}</div>}
-      {post && <FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} />}
+      {post && <FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} onHash={hashtag} />}
       </div>
     </div>
   );

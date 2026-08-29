@@ -3,10 +3,11 @@ import { currentUser, defaultApiBase, getNotifications, login, logout, register 
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
+import { Postboard } from './components/Postboard';
 import type { User } from './types';
 import { VolumeContext } from './volume';
 
-type Tab = 'feed' | 'create' | 'profile';
+type Tab = 'feed' | 'create' | 'profile' | 'postboard';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('feed');
@@ -77,6 +78,7 @@ export default function App() {
             Feed{unreadCount > 0 && <span className="unread-dot" title={`${unreadCount} unread notifications`} />}
           </button>
           <button className={tab === 'create' ? 'active' : ''} onClick={() => setTab('create')}>Create video</button>
+          <button className={tab === 'postboard' ? 'active' : ''} onClick={() => setTab('postboard')}>Postboard</button>
           <button className={tab === 'profile' && profileId === user.id ? 'active' : ''} onClick={() => openProfile(user.id)}>Profile</button>
         </nav>
         <div className="identity">
@@ -97,6 +99,7 @@ export default function App() {
         {status && <div className="connection-status">{status}</div>}
         {tab === 'feed' && <Feed apiBase={apiBase} token={token} user={user} refreshToken={refreshToken} initialPostId={feedPostId} onUnreadCount={setUnreadCount} onProfile={openProfile} />}
         {tab === 'create' && <Composer apiBase={apiBase} token={token} onPosted={() => { setRefreshToken((n) => n + 1); setTab('feed'); }} />}
+        {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
         {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
       </main>
     </div>

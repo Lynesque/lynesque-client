@@ -80,7 +80,7 @@ export interface Comment {
   user?: User;
 }
 
-export type NotificationKind = 'post_like' | 'post_dislike' | 'follow' | 'comment_mention' | 'video_mention' | 'comment' | 'comment_like' | 'comment_dislike';
+export type NotificationKind = 'post_like' | 'post_dislike' | 'follow' | 'comment_mention' | 'video_mention' | 'comment' | 'comment_like' | 'comment_dislike' | 'board_like' | 'board_dislike' | 'board_comment' | 'board_mention' | 'board_comment_mention' | 'board_comment_like' | 'board_comment_dislike';
 
 export interface Notification {
   id: string;
@@ -88,6 +88,7 @@ export interface Notification {
   actor?: User;
   kind: NotificationKind;
   postId?: string;
+  boardPostId?: string;
   commentId?: string;
   createdAt: string;
   readAt?: string;
@@ -98,6 +99,8 @@ export interface Post {
   authorId: string;
   author: User;
   scene: Scene;
+  title: string;
+  viewCount: number;
   likes: string[];
   likeCount: number;
   upvoteCount: number;
@@ -107,6 +110,12 @@ export interface Post {
   dislikedByViewer: boolean;
   comments: Comment[];
   createdAt: string;
+}
+
+export interface BoardPost {
+  id: string; authorId: string; author: User; text: string; stickerAssetId?: string; sticker?: AssetRecord;
+  likes: string[]; dislikes: string[]; likeCount: number; likedByViewer: boolean; dislikedByViewer: boolean;
+  comments: Comment[]; createdAt: string;
 }
 
 export interface Profile {

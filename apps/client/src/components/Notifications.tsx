@@ -10,7 +10,14 @@ const messages: Record<Notification['kind'], string> = {
   video_mention: 'mentioned you in video text',
   comment: 'commented on your video',
   comment_like: 'liked your comment',
-  comment_dislike: 'disliked your comment'
+  comment_dislike: 'disliked your comment',
+  board_like: 'liked your Postboard post',
+  board_dislike: 'disliked your Postboard post',
+  board_comment: 'commented on your Postboard post',
+  board_mention: 'mentioned you in a Postboard post',
+  board_comment_mention: 'mentioned you in a Postboard comment',
+  board_comment_like: 'liked your Postboard comment',
+  board_comment_dislike: 'disliked your Postboard comment'
 };
 
 export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onProfile, onHide }: {
