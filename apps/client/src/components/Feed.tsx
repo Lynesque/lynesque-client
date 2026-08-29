@@ -7,6 +7,7 @@ import { Notifications } from './Notifications';
 import { AssetLibrary } from './AssetLibrary';
 import { AdminMenu } from './AdminMenu';
 import { UserAvatar, UserName } from './UserIdentity';
+import { isAdminUser } from '../permissions';
 
 function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVisible, onPost, onDeleted, onProfile, onHash }: {
   apiBase: string; token: string; viewer: User; post: Post; commentsVisible: boolean; setCommentsVisible: React.Dispatch<React.SetStateAction<boolean>>; onPost: (post: Post) => void; onDeleted: () => void; onProfile: (id: string) => void; onHash: (tag: string) => void;
@@ -16,12 +17,13 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
   const [stickersVisible, setStickersVisible] = useState(false);
   const [sticker, setSticker] = useState<AssetRecord | null>(null);
   const [copied, setCopied] = useState(false);
+  const canModerate=isAdminUser(viewer);
   const refreshPost = async () => onPost((await getPost(apiBase, token, post.id)).post);
   const reference = `LYN-${post.id.slice(0, 8).toUpperCase()}`;
   const publicOrigin = /^(lyneque|lynesque)\.com$/i.test(window.location.hostname) ? window.location.origin : 'https://lyneque.com';
   const shareUrl = `${publicOrigin}/?video=${encodeURIComponent(post.id)}`;
   const report=async(input:Parameters<typeof createReport>[2])=>{const reason=window.prompt('Why are you reporting this?');if(reason?.trim())await createReport(apiBase,token,{...input,reason});};
-  const deleteVideo=async()=>{if(!window.confirm(`Delete “${post.title}”?`))return;if(viewer.isAdmin){const reason=window.prompt('Reason shown to the creator and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeletePost(apiBase,token,post.id,reason);}else await deletePost(apiBase,token,post.id);onDeleted();};
+  const deleteVideo=async()=>{if(!window.confirm(`Delete “${post.title}”?`))return;if(canModerate){const reason=window.prompt('Reason shown to the creator and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeletePost(apiBase,token,post.id,reason);}else await deletePost(apiBase,token,post.id);onDeleted();};
   return (
     <div className={`post-with-comments ${commentsVisible ? 'comments-open' : ''}`}>
     <article className="feed-post panel">
@@ -33,7 +35,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
             onPost({ ...post, author: user });
           }}>{post.author.followedByViewer ? 'Following' : 'Follow'}</button>}
         </div>
-        <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span><AdminMenu label="Video options" onDelete={viewer.isAdmin||post.authorId===viewer.id?deleteVideo:undefined} onReport={!viewer.isAdmin&&post.authorId!==viewer.id?()=>report({targetType:'post',postId:post.id,reason:''}):undefined}/></div>
+        <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span><AdminMenu label="Video options" onDelete={canModerate||post.authorId===viewer.id?deleteVideo:undefined} onReport={!canModerate&&post.authorId!==viewer.id?()=>report({targetType:'post',postId:post.id,reason:''}):undefined}/></div>
       </div>
       <div className="video-title-row"><h2 className="video-post-title">{post.title.split(/(#[a-zA-Z0-9_-]+)/g).map((part,index)=>part.startsWith('#')?<button className="text-link" key={index} onClick={()=>onHash(part)}>{part}</button>:part)}</h2><code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
       <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>
@@ -60,7 +62,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
                 <button className={entry.likedByViewer ? 'liked' : ''} onClick={async () => onPost((await toggleCommentReaction(apiBase, token, post.id, entry.id, 'like')).post)}>▲</button>
                 <strong>{entry.likeCount}</strong>
                 <button className={entry.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleCommentReaction(apiBase, token, post.id, entry.id, 'dislike')).post)}>▼</button>
-                <AdminMenu label="Comment options" onDelete={viewer.isAdmin||entry.userId===viewer.id?async()=>{if(!window.confirm('Delete this comment?'))return;if(viewer.isAdmin){const reason=window.prompt('Reason shown to the commenter and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeleteComment(apiBase,token,post.id,entry.id,reason);}else await deleteComment(apiBase,token,post.id,entry.id);await refreshPost();}:undefined} onReport={!viewer.isAdmin&&entry.userId!==viewer.id?()=>report({targetType:'comment',postId:post.id,commentId:entry.id,reason:''}):undefined}/>
+                <AdminMenu label="Comment options" onDelete={canModerate||entry.userId===viewer.id?async()=>{if(!window.confirm('Delete this comment?'))return;if(canModerate){const reason=window.prompt('Reason shown to the commenter and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeleteComment(apiBase,token,post.id,entry.id,reason);}else await deleteComment(apiBase,token,post.id,entry.id);await refreshPost();}:undefined} onReport={!canModerate&&entry.userId!==viewer.id?()=>report({targetType:'comment',postId:post.id,commentId:entry.id,reason:''}):undefined}/>
               </div>
             </div>
           </div>
@@ -79,7 +81,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
         {sticker && <div className="selected-sticker"><img src={mediaUrl(apiBase, sticker.id)} alt="Selected sticker" /><button type="button" onClick={() => setSticker(null)}>Remove</button></div>}
         <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
       </form>
-      {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} viewer={viewer} isAdmin={viewer.isAdmin} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
+      {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} viewer={viewer} isAdmin={canModerate} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
     </aside>}
     </div>
   );

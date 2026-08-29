@@ -4,6 +4,7 @@ import { useTimeline } from '../useTimeline';
 import type { Post, Profile, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
 import { UserAvatar, UserName } from './UserIdentity';
+import { isAdminUser } from '../permissions';
 
 export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onProfile, onOpenPost }: {
   apiBase: string; token: string; viewer:User; userId: string; onUserChanged: (user: User) => void; onProfile: (id: string) => void; onOpenPost: (postId: string) => void;
@@ -67,7 +68,7 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
           <input ref={fileInput} hidden type="file" accept="image/*" onChange={(event) => changeAvatar(event.target.files?.[0])} />
           <button disabled={viewer.accountStatus==='unverified'} onClick={() => fileInput.current?.click()}>Change profile picture</button>
         </div>}
-        {viewer.isAdmin&&<div className="profile-admin-controls"><label>Account status<select value={profile.user.accountStatus} onChange={async(event)=>{await setAccountStatus(apiBase,token,profile.user.id,event.target.value as User['accountStatus']);await load();}}><option value="verified">Verified</option><option value="default">Default</option><option value="unverified">Unverified</option></select></label>{viewer.isMegaAdmin&&profile.user.id!==viewer.id&&<><button onClick={async()=>{await setAdminRole(apiBase,token,profile.user.id,!profile.user.isAdmin);await load();}}>{profile.user.isAdmin?'Remove admin':'Make admin'}</button>{profile.user.adminBlockedUntil&&<button onClick={async()=>{await restoreAdminActions(apiBase,token,profile.user.id);await load();}}>Restore admin actions</button>}</>}</div>}
+        {isAdminUser(viewer)&&<div className="profile-admin-controls"><label>Account status<select value={profile.user.accountStatus} onChange={async(event)=>{await setAccountStatus(apiBase,token,profile.user.id,event.target.value as User['accountStatus']);await load();}}><option value="verified">Verified</option><option value="default">Default</option><option value="unverified">Unverified</option></select></label>{viewer.isMegaAdmin&&profile.user.id!==viewer.id&&<><button onClick={async()=>{await setAdminRole(apiBase,token,profile.user.id,!profile.user.isAdmin);await load();}}>{profile.user.isAdmin?'Remove admin':'Make admin'}</button>{profile.user.adminBlockedUntil&&<button onClick={async()=>{await restoreAdminActions(apiBase,token,profile.user.id);await load();}}>Restore admin actions</button>}</>}</div>}
       </section>
       {status && <div className="status">{status}</div>}
       <div className="profile-content">
@@ -91,7 +92,7 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
             <button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button>
             <button className="primary" onClick={() => onOpenPost(selected.id)}>Open in feed</button>
             {profile.isOwnProfile&&<button className="danger" onClick={async()=>{if(!window.confirm(`Delete “${selected.title}”? The uploaded assets will stay in the library.`))return;await deletePost(apiBase,token,selected.id);await load();}}>Delete video</button>}
-            {viewer.isAdmin&&!profile.isOwnProfile&&<button className="danger" onClick={async()=>{if(!window.confirm(`Delete “${selected.title}” as an admin?`))return;const reason=window.prompt('Reason shown to the creator and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeletePost(apiBase,token,selected.id,reason);await load();}}>Admin delete</button>}
+            {isAdminUser(viewer)&&!profile.isOwnProfile&&<button className="danger" onClick={async()=>{if(!window.confirm(`Delete “${selected.title}” as an admin?`))return;const reason=window.prompt('Reason shown to the creator and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeletePost(apiBase,token,selected.id,reason);await load();}}>Admin delete</button>}
           </div>
         </section>}
       </div>

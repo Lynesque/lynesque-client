@@ -5,6 +5,7 @@ import type { AssetRecord, Scene, SceneLayer, TransformKeyframe,User } from '../
 import { LayerInspector } from './LayerInspector';
 import { AssetLibrary } from './AssetLibrary';
 import { SceneCanvas } from './SceneCanvas';
+import { isAdminUser } from '../permissions';
 
 interface Props {
   apiBase: string;
@@ -199,7 +200,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
       </section>
 
       <aside className="panel composer-right">
-        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={user.isAdmin} viewer={user} allowPending sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
+        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={isAdminUser(user)} viewer={user} allowPending sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
         <h3>Layers</h3>
         <div className="layer-list">
           {[...hydratedScene.layers].reverse().map((layer) => {

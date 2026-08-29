@@ -10,6 +10,7 @@ import type { User } from './types';
 import { VolumeContext } from './volume';
 import { UserAvatar, UserName } from './components/UserIdentity';
 import { applyTheme } from './theme';
+import { isAdminUser } from './permissions';
 
 type Tab = 'feed' | 'create' | 'profile' | 'postboard' | 'settings' | 'admin';
 
@@ -96,7 +97,7 @@ export default function App() {
           <button className={tab === 'postboard' ? 'active nav-feed' : 'nav-feed'} onClick={() => setTab('postboard')}>Postboard{boardUnreadCount>0&&<span className="unread-dot"/>}</button>
           <button className={tab === 'profile' && profileId === user.id ? 'active' : ''} onClick={() => openProfile(user.id)}>Profile</button>
           <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
-          {user.isAdmin&&<button className={tab==='admin'?'active':''} onClick={()=>setTab('admin')}>Admin</button>}
+          {isAdminUser(user)&&<button className={tab==='admin'?'active':''} onClick={()=>setTab('admin')}>Admin</button>}
         </nav>
         <div className="identity">
           <label className="volume-control" title={`Volume ${Math.round(volume * 100)}%`}>
@@ -119,10 +120,10 @@ export default function App() {
         {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
         {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
         {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user}/>} 
-        {tab==='admin'&&user.isAdmin&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>} 
+        {tab==='admin'&&isAdminUser(user)&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>}
       </main>
       {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}
-      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet.</p><p>If an admin approves one of your reviewed uploads, your account becomes verified automatically. A denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
+      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet.</p><p>Approved uploads become public, but your account stays unverified unless an admin separately changes it to default or verified. A denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
     </div>
     </VolumeContext.Provider>
   );
