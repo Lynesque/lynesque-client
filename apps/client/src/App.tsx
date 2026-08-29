@@ -119,7 +119,7 @@ export default function App() {
         {tab === 'create' && <Composer apiBase={apiBase} token={token} user={user} onPosted={(pending) => { setRefreshToken((n) => n + 1); if(!pending)setTab('feed'); }} />}
         {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
         {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
-        {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user}/>} 
+        {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user} onUserChanged={setUser}/>}
         {tab==='admin'&&isAdminUser(user)&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>}
       </main>
       {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}

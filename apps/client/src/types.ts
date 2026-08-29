@@ -71,8 +71,22 @@ export interface User {
   isMegaAdmin: boolean;
   isVerified: boolean;
   accountStatus: AccountStatus;
+  manualAccountStatus?: AccountStatus;
   adminBlockedUntil?: string;
   suspension?: { reason: string; until: string };
+}
+
+export interface PatreonStatus {
+  configured: boolean;
+  webhookConfigured: boolean;
+  eligible: boolean;
+  linked: boolean;
+  entitled: boolean;
+  tierTitle?: string;
+  patronStatus?: string;
+  lastChargeStatus?: string;
+  lastCheckedAt?: string;
+  error?: string;
 }
 
 export interface Comment {

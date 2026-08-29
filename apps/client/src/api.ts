@@ -1,4 +1,4 @@
-import type { AdminLog, AssetRecord, BoardPost, Notification, NotificationPreferences, Post, Profile, Report, Scene, Suspension, User } from './types';
+import type { AdminLog, AssetRecord, BoardPost, Notification, NotificationPreferences, PatreonStatus, Post, Profile, Report, Scene, Suspension, User } from './types';
 
 const queryApi = new URLSearchParams(window.location.search).get('api');
 export const publicApiBases = ['https://lyneque.com', 'https://lynesque.com'] as const;
@@ -47,6 +47,11 @@ export async function currentUser(apiBase: string, token: string) {
 export async function logout(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', headers: authHeaders(token) }));
 }
+
+export async function getPatreonStatus(apiBase:string,token:string){return parse<PatreonStatus>(await fetch(`${apiBase}/api/integrations/patreon/status`,{headers:authHeaders(token)}));}
+export async function beginPatreonLink(apiBase:string,token:string){return parse<{authorizationUrl:string}>(await fetch(`${apiBase}/api/integrations/patreon/start`,{method:'POST',headers:authHeaders(token)}));}
+export async function refreshPatreonLink(apiBase:string,token:string){return parse<{user:User;entitled:boolean}>(await fetch(`${apiBase}/api/integrations/patreon/refresh`,{method:'POST',headers:authHeaders(token)}));}
+export async function unlinkPatreon(apiBase:string,token:string){return parse<{user:User}>(await fetch(`${apiBase}/api/integrations/patreon`,{method:'DELETE',headers:authHeaders(token)}));}
 
 export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name) {
   return parse<{ asset: AssetRecord; deduplicated: boolean;pending?:boolean;message?:string }>(await fetch(`${apiBase}/api/assets`, {
