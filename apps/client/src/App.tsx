@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currentUser, getBoardNotifications, getNotifications, login, logout, register, resolveApiBase } from './api';
+import { currentUser, getBoardNotifications, getMediaAccess, getNotifications, login, logout, register, requestEmailVerification, resolveApiBase, setMediaAccessToken } from './api';
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
@@ -29,7 +29,8 @@ export default function App() {
   const [feedPostId, setFeedPostId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get('video') || undefined);
   const [apiBase, setApiBase] = useState('');
 
-  const acceptSession = (nextUser: User, nextToken: string) => {
+  const acceptSession = (nextUser: User, nextToken: string,mediaToken='') => {
+    setMediaAccessToken(mediaToken);
     setUser(nextUser);
     setToken(nextToken);
     setProfileId(nextUser.id);
@@ -47,7 +48,7 @@ export default function App() {
 
   useEffect(() => {
     if (!apiBase || !token) return;
-    currentUser(apiBase, token).then(({ user: restored }) => acceptSession(restored, token)).catch(() => {
+    Promise.all([currentUser(apiBase, token),getMediaAccess(apiBase,token)]).then(([{ user: restored },media]) => acceptSession(restored, token,media.mediaToken)).catch(() => {
       setToken('');
       localStorage.removeItem('lynesque-token');
     });
@@ -74,6 +75,7 @@ export default function App() {
   const signOut = async () => {
     try { if (token) await logout(apiBase, token); } catch (_) {}
     localStorage.removeItem('lynesque-token');
+    setMediaAccessToken('');
     setToken('');
     setUser(null);
     setTab('feed');
@@ -108,7 +110,7 @@ export default function App() {
               localStorage.setItem('lynesque-volume', String(next));
             }} />
           </label>
-          <button className="user-link topbar-user" onClick={() => openProfile(user.id)}><UserAvatar apiBase={apiBase} user={user} small/><UserName compact user={user}/></button>
+          <button className="user-link topbar-user" onClick={() => openProfile(user.id)}><UserAvatar apiBase={apiBase} user={user} small/><UserName apiBase={apiBase} compact user={user}/></button>
           <button onClick={signOut}>Log out</button>
         </div>
       </header>
@@ -116,14 +118,14 @@ export default function App() {
       <main>
         {status && <div className="connection-status">{status}</div>}
         {tab === 'feed' && <Feed apiBase={apiBase} token={token} user={user} refreshToken={refreshToken} initialPostId={feedPostId} onUnreadCount={setUnreadCount} onProfile={openProfile} />}
-        {tab === 'create' && <Composer apiBase={apiBase} token={token} user={user} onPosted={(pending) => { setRefreshToken((n) => n + 1); if(!pending)setTab('feed'); }} />}
+        {tab === 'create' && <Composer apiBase={apiBase} token={token} user={user} onSettings={()=>setTab('settings')} onPosted={(pending) => { setRefreshToken((n) => n + 1); if(!pending)setTab('feed'); }} />}
         {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
-        {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
+        {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onSettings={()=>setTab('settings')} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
         {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user} onUserChanged={setUser}/>}
         {tab==='admin'&&isAdminUser(user)&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>}
       </main>
       {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}
-      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet.</p><p>Approved uploads become public, but your account stays unverified unless an admin separately changes it to default or verified. A denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
+      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet. Video uploads have a shared three-hour publishing cooldown.</p><p>Approved uploads become public, but your account stays unverified unless an admin separately changes it to default or verified. New accounts should verify an email before routine promotion; a denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
     </div>
     </VolumeContext.Provider>
   );
@@ -131,18 +133,19 @@ export default function App() {
 
 function AuthScreen({ apiBase, status, setStatus, onSession }: {
   apiBase:string; status: string; setStatus: (value: string) => void;
-  onSession: (user: User, token: string) => void;
+  onSession: (user: User, token: string,mediaToken?:string) => void;
 }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email,setEmail]=useState('');
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setStatus(mode === 'login' ? 'Signing in...' : 'Creating account...');
     try {
       const result = mode === 'login' ? await login(apiBase, username, password) : await register(apiBase, username, password);
-      setStatus('');
-      onSession(result.user, result.token);
+      onSession(result.user, result.token,result.mediaToken);
+      if(mode==='register'&&email.trim()){try{const sent=await requestEmailVerification(apiBase,result.token,email.trim());setStatus(sent.message||'Account created. Check your email for the verification link.');}catch(error){setStatus(`Account created, but email verification was not sent: ${error instanceof Error?error.message:'unknown error'}`);}}else setStatus('');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not connect.');
     }
@@ -155,6 +158,7 @@ function AuthScreen({ apiBase, status, setStatus, onSession }: {
         <h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
         <label>Username<input autoFocus value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
+        {mode==='register'&&<><small>New passwords must be at least 10 characters.</small><label>Email (recommended for account approval)<input type="email" value={email} onChange={(event)=>setEmail(event.target.value)} autoComplete="email" placeholder="Used for verification"/></label></>}
         {status && <div className="status">{status}</div>}
         <button className="primary" type="submit">{mode === 'login' ? 'Sign in' : 'Create account'}</button>
         <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setStatus(''); }}>

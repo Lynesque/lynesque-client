@@ -17,9 +17,16 @@ export async function resolveApiBase() {
   return publicApiBases[0];
 }
 
+export class ApiError extends Error {
+  code?: string;
+  retryAfterSeconds?: number;
+  settingsLink?: boolean;
+  constructor(message:string, details:Record<string,unknown>={}) { super(message); this.name='ApiError'; this.code=typeof details.code==='string'?details.code:undefined;this.retryAfterSeconds=typeof details.retryAfterSeconds==='number'?details.retryAfterSeconds:undefined;this.settingsLink=details.settingsLink===true; }
+}
+
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `${response.status} ${response.statusText}`);
+  if (!response.ok) throw new ApiError(body.error || `${response.status} ${response.statusText}`, body);
   return body as T;
 }
 
@@ -29,13 +36,13 @@ const authHeaders = (token: string, json = false) => ({
 });
 
 export async function register(apiBase: string, username: string, password: string) {
-  return parse<{ user: User; token: string }>(await fetch(`${apiBase}/api/auth/register`, {
+  return parse<{ user: User; token: string;mediaToken:string }>(await fetch(`${apiBase}/api/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
   }));
 }
 
 export async function login(apiBase: string, username: string, password: string) {
-  return parse<{ user: User; token: string }>(await fetch(`${apiBase}/api/auth/login`, {
+  return parse<{ user: User; token: string;mediaToken:string }>(await fetch(`${apiBase}/api/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
   }));
 }
@@ -43,6 +50,7 @@ export async function login(apiBase: string, username: string, password: string)
 export async function currentUser(apiBase: string, token: string) {
   return parse<{ user: User }>(await fetch(`${apiBase}/api/auth/me`, { headers: authHeaders(token) }));
 }
+export async function getMediaAccess(apiBase:string,token:string){return parse<{mediaToken:string}>(await fetch(`${apiBase}/api/auth/media-access`,{method:'POST',headers:authHeaders(token)}));}
 
 export async function logout(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', headers: authHeaders(token) }));
@@ -124,10 +132,13 @@ export async function markNotificationsRead(apiBase: string, token: string) {
 export async function clearNotifications(apiBase:string,token:string){return parse<{ok:boolean;cleared:number}>(await fetch(`${apiBase}/api/notifications`,{method:'DELETE',headers:authHeaders(token)}));}
 export async function getNotificationSettings(apiBase:string,token:string){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{headers:authHeaders(token)}));}
 export async function setNotificationSettings(apiBase:string,token:string,preferences:NotificationPreferences){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({preferences})}));}
+export async function requestEmailVerification(apiBase:string,token:string,email:string){return parse<{ok?:boolean;message?:string;alreadyVerified?:boolean;user?:User}>(await fetch(`${apiBase}/api/settings/email`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({email})}));}
+export async function getEmojis(apiBase:string){return parse<{emojis:string[]}>(await fetch(`${apiBase}/api/emojis`));}
+export async function setEmojiBadge(apiBase:string,token:string,name?:string){return parse<{user:User}>(await fetch(`${apiBase}/api/settings/emoji-badge`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({name:name||''})}));}
 export async function createReport(apiBase:string,token:string,input:{targetType:import('./types').ReportTargetType;username?:string;assetId?:string;postId?:string;boardPostId?:string;commentId?:string;reason:string}){return parse<{report:Report}>(await fetch(`${apiBase}/api/reports`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(input)}));}
 export async function getAdminOverview(apiBase:string,token:string,limit=30){return parse<{reports:Report[];suspensions:Suspension[];logs:AdminLog[];pendingAssets:AssetRecord[];pendingPosts:Post[];hasMore:Record<string,boolean>}>(await fetch(`${apiBase}/api/admin/overview?limit=${limit}`,{headers:authHeaders(token)}));}
 export async function setAdminRole(apiBase:string,token:string,userId:string,enabled:boolean){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/admin`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled})}));}
-export async function setAccountStatus(apiBase:string,token:string,userId:string,status:import('./types').AccountStatus){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/status`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({status})}));}
+export async function setAccountStatus(apiBase:string,token:string,userId:string,status:import('./types').AccountStatus,allowWithoutVerifiedEmail=false){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/status`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({status,allowWithoutVerifiedEmail})}));}
 export async function resolvePending(apiBase:string,token:string,type:'asset'|'post',id:string,decision:'accepted'|'denied',reason=''){return parse<{decision:'accepted'|'denied';uploaderId?:string;uploader?:User;pendingReviewCount:number;offerDefault:boolean;asset?:AssetRecord;post?:Post}>(await fetch(`${apiBase}/api/admin/review/${type}/${encodeURIComponent(id)}`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({decision,reason})}));}
 export async function restoreAdminActions(apiBase:string,token:string,userId:string){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/restore`,{method:'POST',headers:authHeaders(token)}));}
 export async function suspendUser(apiBase:string,token:string,username:string,reason:string,hours:number){return parse<{suspension:Suspension}>(await fetch(`${apiBase}/api/admin/suspensions`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({username,reason,hours})}));}
@@ -140,8 +151,8 @@ export const adminDeleteComment=(apiBase:string,token:string,postId:string,id:st
 export const adminDeleteBoardPost=(apiBase:string,token:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(id)}`,reason);
 export const adminDeleteBoardComment=(apiBase:string,token:string,postId:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(postId)}/comments/${encodeURIComponent(id)}`,reason);
 
-export async function getProfile(apiBase: string, token: string, userId: string,offset=0,limit=20) {
-  return parse<Profile>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/profile?offset=${offset}&limit=${limit}`, { headers: authHeaders(token) }));
+export async function getProfile(apiBase: string, token: string, userId: string,offset=0,limit=20,section:'videos'|'assets'|'postboard'='videos') {
+  return parse<Profile>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/profile?offset=${offset}&limit=${limit}&section=${section}`, { headers: authHeaders(token) }));
 }
 export async function searchUsers(apiBase:string,token:string,query:string){return parse<{users:User[]}>(await fetch(`${apiBase}/api/search/users?q=${encodeURIComponent(query)}`,{headers:authHeaders(token)}));}
 
@@ -155,5 +166,8 @@ export async function runShitTok(apiBase: string, token: string) {
   return parse<Record<string, unknown>>(await fetch(`${apiBase}/api/shittok/run`, { method: 'POST', headers: authHeaders(token) }));
 }
 
-export const mediaUrl = (apiBase: string, assetId: string) => `${apiBase}/media/${encodeURIComponent(assetId)}`;
+let mediaAccessToken='';
+export const setMediaAccessToken=(token='')=>{mediaAccessToken=token;};
+export const mediaUrl = (apiBase: string, assetId: string) => `${apiBase}/media/${encodeURIComponent(assetId)}${mediaAccessToken?`?access=${encodeURIComponent(mediaAccessToken)}`:''}`;
 export const avatarUrl = (apiBase: string, assetId: string) => `${apiBase}/avatar/${encodeURIComponent(assetId)}`;
+export const emojiUrl = (apiBase:string,name:string)=>`${apiBase}/emoji/${encodeURIComponent(name)}`;

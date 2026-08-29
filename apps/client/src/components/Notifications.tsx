@@ -72,7 +72,7 @@ export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onPro
       {items.map((item) => <div className={`notification ${highlighted.current.has(item.id) ? 'notification-new' : ''}`} key={item.id}>
         <button className="notification-avatar" onClick={() => onProfile(item.actor?.id || item.actorId)}><UserAvatar apiBase={apiBase} user={item.actor} small /></button>
         <button className="notification-body" onClick={() => item.postId ? onOpenPost(item.postId) : onProfile(item.actor?.id || item.actorId)}>
-          <span>{item.message || <><strong><UserName compact user={item.actor} fallbackId={item.actorId}/></strong> {messages[item.kind]}</>}</span>
+          <span>{item.message || <><strong><UserName apiBase={apiBase} compact user={item.actor} fallbackId={item.actorId}/></strong> {messages[item.kind]}</>}</span>
           <time>{new Date(item.createdAt).toLocaleString()}</time>
         </button>
       </div>)}

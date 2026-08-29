@@ -8,6 +8,7 @@ import { AssetLibrary } from './AssetLibrary';
 import { AdminMenu } from './AdminMenu';
 import { UserAvatar, UserName } from './UserIdentity';
 import { isAdminUser } from '../permissions';
+import { EmojiButton, RichText } from './CustomEmoji';
 
 function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVisible, onPost, onDeleted, onProfile, onHash }: {
   apiBase: string; token: string; viewer: User; post: Post; commentsVisible: boolean; setCommentsVisible: React.Dispatch<React.SetStateAction<boolean>>; onPost: (post: Post) => void; onDeleted: () => void; onProfile: (id: string) => void; onHash: (tag: string) => void;
@@ -29,7 +30,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
     <article className="feed-post panel">
       <div className="post-head">
         <div className="creator-line">
-          <button className="creator-link" onClick={() => onProfile(post.author.id)}><UserAvatar apiBase={apiBase} user={post.author} /><span><UserName user={post.author}/><small>{post.author.followerCount} followers</small></span></button>
+          <button className="creator-link" onClick={() => onProfile(post.author.id)}><UserAvatar apiBase={apiBase} user={post.author} /><span><UserName apiBase={apiBase} user={post.author}/><small>{post.author.followerCount} followers</small></span></button>
           {post.author.id !== viewer.id && <button className={post.author.followedByViewer ? 'following' : 'follow'} onClick={async () => {
             const { user } = await toggleFollow(apiBase, token, post.author.id);
             onPost({ ...post, author: user });
@@ -37,7 +38,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
         </div>
         <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span><AdminMenu label="Video options" onDelete={canModerate||post.authorId===viewer.id?deleteVideo:undefined} onReport={!canModerate&&post.authorId!==viewer.id?()=>report({targetType:'post',postId:post.id,reason:''}):undefined}/></div>
       </div>
-      <div className="video-title-row"><h2 className="video-post-title">{post.title.split(/(#[a-zA-Z0-9_-]+)/g).map((part,index)=>part.startsWith('#')?<button className="text-link" key={index} onClick={()=>onHash(part)}>{part}</button>:part)}</h2><code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
+      <div className="video-title-row"><h2 className="video-post-title"><RichText apiBase={apiBase} text={post.title} onHash={onHash}/></h2><code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
       <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>
         <SceneCanvas scene={post.scene} time={timeline.time} playing={timeline.playing} apiBase={apiBase} />
         {!timeline.playing && <div className="play-overlay">▶</div>}
@@ -55,7 +56,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
           <div className="comment" key={entry.id}>
             <UserAvatar apiBase={apiBase} user={entry.user} small />
             <div className="comment-content">
-              <span><button className="inline-user" onClick={() => onProfile(entry.user?.id || entry.userId)}><UserName compact user={entry.user} fallbackId={entry.userId}/></button> {entry.text}</span>
+              <span><button className="inline-user" onClick={() => onProfile(entry.user?.id || entry.userId)}><UserName apiBase={apiBase} compact user={entry.user} fallbackId={entry.userId}/></button> <RichText apiBase={apiBase} text={entry.text}/></span>
               {entry.stickerAssetId && <img className="comment-sticker" src={mediaUrl(apiBase, entry.stickerAssetId)} alt="Sticker" loading="lazy" />}
               <div className="comment-meta">
                 <time>{new Date(entry.createdAt).toLocaleString()}</time>
@@ -72,14 +73,18 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
       <form className="comment-box" onSubmit={async (event) => {
         event.preventDefault();
         if (!comment.trim() && !sticker) return;
-        await addComment(apiBase, token, post.id, comment, sticker?.id);
-        setComment('');
-        setSticker(null);
-        setStickersVisible(false);
-        await refreshPost();
+        try {
+          await addComment(apiBase, token, post.id, comment, sticker?.id);
+          setComment('');
+          setSticker(null);
+          setStickersVisible(false);
+          await refreshPost();
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : 'Comment failed.');
+        }
       }}>
         {sticker && <div className="selected-sticker"><img src={mediaUrl(apiBase, sticker.id)} alt="Selected sticker" /><button type="button" onClick={() => setSticker(null)}>Remove</button></div>}
-        <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
+        <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><EmojiButton apiBase={apiBase} onInsert={(code)=>setComment((value)=>(value+code).slice(0,500))}/><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
       </form>
       {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} viewer={viewer} isAdmin={canModerate} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
     </aside>}
@@ -101,8 +106,8 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
   const [catalogueQuery,setCatalogueQuery]=useState<string|null>(null);const [history,setHistory]=useState<Post[]>([]);const [historyIndex,setHistoryIndex]=useState(0);
   const arrowSide = localStorage.getItem('lynesque-arrow-side') === 'right' ? 'right' : 'left';
 
-  const loadRecommended=async(reset=false)=>{try{if(reset){const result=await getFeed(apiBase,token,[]);const first=result.posts[0]||null;setHistory(first?[first]:[]);setHistoryIndex(0);setPost(first);setOffset(0);setTotal(result.total);setVideoNumber('1');setCatalogueQuery(null);setStatus(first?'Recommended feed · unseen and recent videos are favored.':'No videos yet.');return;}if(historyIndex+1<history.length){const next=historyIndex+1;setHistoryIndex(next);setPost(history[next]);setOffset(next);setVideoNumber(String(next+1));return;}const result=await getFeed(apiBase,token,history.map((item)=>item.id));const nextPost=result.posts[0];if(nextPost){const next=[...history,nextPost];setHistory(next);setHistoryIndex(next.length-1);setPost(nextPost);setOffset(next.length-1);setVideoNumber(String(next.length));setTotal(result.total);}}catch(error){setStatus(error instanceof Error?error.message:'Feed failed.');}};
-  const loadCatalogue=async(nextOffset:number,query=catalogueQuery??'')=>{try{const result=await searchVideos(apiBase,token,query,nextOffset,1);setCatalogueQuery(query);setPost(result.posts[0]||null);setOffset(result.posts.length?result.offset:Math.max(0,Math.min(nextOffset,result.total-1)));setTotal(result.total);setVideoNumber(String(result.posts.length?result.offset+1:1));setStatus(result.posts.length?(query?`Search: ${query}`:'Full catalogue · newest first'):'No videos matched that search.');}catch(error){setStatus(error instanceof Error?error.message:'Search failed.');}};
+  const loadRecommended=async(reset=false)=>{try{if(reset){const result=await getFeed(apiBase,token,[]);const first=result.posts[0]||null;setHistory(first?[first]:[]);setHistoryIndex(0);setPost(first);setOffset(0);setTotal(result.total);setVideoNumber('1');setCatalogueQuery(null);setStatus(first?'':'No videos yet.');return;}if(historyIndex+1<history.length){const next=historyIndex+1;setHistoryIndex(next);setPost(history[next]);setOffset(next);setVideoNumber(String(next+1));return;}const result=await getFeed(apiBase,token,history.map((item)=>item.id));const nextPost=result.posts[0];if(nextPost){const next=[...history,nextPost];setHistory(next);setHistoryIndex(next.length-1);setPost(nextPost);setOffset(next.length-1);setVideoNumber(String(next.length));setTotal(result.total);}}catch(error){setStatus(error instanceof Error?error.message:'Feed failed.');}};
+  const loadCatalogue=async(nextOffset:number,query=catalogueQuery??'')=>{try{const result=await searchVideos(apiBase,token,query,nextOffset,1);setCatalogueQuery(query);setPost(result.posts[0]||null);setOffset(result.posts.length?result.offset:Math.max(0,Math.min(nextOffset,result.total-1)));setTotal(result.total);setVideoNumber(String(result.posts.length?result.offset+1:1));setStatus(result.posts.length?(query?`Search: ${query}`:''):'No videos matched that search.');}catch(error){setStatus(error instanceof Error?error.message:'Search failed.');}};
 
   const openPost = async (postId: string) => {
     try {

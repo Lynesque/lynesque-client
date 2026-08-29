@@ -72,6 +72,11 @@ export interface User {
   isVerified: boolean;
   accountStatus: AccountStatus;
   manualAccountStatus?: AccountStatus;
+  customEmojiBadge?: string;
+  email?: string;
+  hasEmail?: boolean;
+  emailVerified?: boolean;
+  emailRequired?: boolean;
   adminBlockedUntil?: string;
   suspension?: { reason: string; until: string };
 }
@@ -157,6 +162,11 @@ export interface Profile {
   user: User;
   totalLikes: number;
   posts: Post[];
+  assets: AssetRecord[];
+  boardPosts: BoardPost[];
+  section: 'videos'|'assets'|'postboard';
+  counts: { videos:number;assets:number;postboard:number };
+  assetQuota: { usedBytes:number;byteLimit:number;usedUnits:number;unitLimit:number;remainingPercent:number };
   total:number;
   hasMore:boolean;
   isOwnProfile: boolean;

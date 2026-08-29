@@ -1,17 +1,19 @@
 import { useMemo, useRef, useState } from 'react';
-import { createPost, uploadAsset } from '../api';
+import { ApiError, createPost, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { AssetRecord, Scene, SceneLayer, TransformKeyframe,User } from '../types';
 import { LayerInspector } from './LayerInspector';
 import { AssetLibrary } from './AssetLibrary';
 import { SceneCanvas } from './SceneCanvas';
 import { isAdminUser } from '../permissions';
+import { EmojiButton } from './CustomEmoji';
 
 interface Props {
   apiBase: string;
   token: string;
   user:User;
   onPosted: (pending:boolean) => void;
+  onSettings: () => void;
 }
 
 const baseFrame = (time: number): TransformKeyframe => ({
@@ -25,7 +27,7 @@ const baseFrame = (time: number): TransformKeyframe => ({
 });
 const MAX_ASSET_LAYERS = 20;
 
-export function Composer({ apiBase, token, user, onPosted }: Props) {
+export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
   const [scene, setScene] = useState<Scene>({ version: 1, duration: 7, background: '#000000', layers: [] });
   const [assets, setAssets] = useState<Record<string, AssetRecord>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
   const [status, setStatus] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(false);
   const [title, setTitle] = useState('');
+  const [settingsSuggested,setSettingsSuggested]=useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const timeline = useTimeline(7);
 
@@ -92,6 +95,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
         assetCount += 1;
         setStatus(message||(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : pending?`${displayName.trim()} is awaiting admin review.`:`${displayName.trim()} uploaded.`));
       } catch (error) {
+        setSettingsSuggested(error instanceof ApiError&&error.settingsLink===true);
         setStatus(error instanceof Error ? error.message : 'Upload failed.');
       }
     }
@@ -155,7 +159,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
   return (
     <div className="composer-layout">
       <section className="composer-left panel">
-        {user.accountStatus==='unverified'&&<div className="review-notice">Your account is unverified. Assets and videos you upload are private and sent to admins for review. Approval verifies your account; denial deletes the reviewed item.</div>}
+        {user.accountStatus==='unverified'&&<div className="review-notice">Your account is unverified. Assets and videos you upload are private and sent to admins for review. Approval makes an item public but does not automatically change your account; denial deletes that reviewed item.</div>}
         <div className="composer-toolbar">
           <input ref={fileInput} hidden multiple type="file" accept="image/*,video/*,audio/*" onChange={(e) => onFiles(e.target.files)} />
           <button onClick={() => fileInput.current?.click()}>Add media</button>
@@ -163,7 +167,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
           <button onClick={addText}>Add text</button>
           <span className="asset-count">Assets {scene.layers.filter((layer)=>layer.kind==='asset').length}/{MAX_ASSET_LAYERS}</span>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
-          <input className="video-title" value={title} maxLength={180} onChange={(event) => setTitle(event.target.value)} placeholder="Video title — #hashtags and @people work" />
+          <span className="field-with-emoji video-title-field"><input className="video-title" value={title} maxLength={180} onChange={(event) => setTitle(event.target.value)} placeholder="Video title — #hashtags and @people work" /><EmojiButton apiBase={apiBase} onInsert={(code)=>setTitle((value)=>(value+code).slice(0,180))}/></span>
           <button className="primary" onClick={publish}>Publish video</button>
         </div>
 
@@ -196,7 +200,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
             >{layer.kind === 'text' ? `T: ${layer.text.slice(0, 18)}` : assets[layer.assetId]?.originalName || layer.assetKind || 'media'}</button>
           ))}
         </div>
-        {status && <div className="status">{status}</div>}
+        {status && <div className="status">{status}{settingsSuggested&&<button type="button" onClick={onSettings}>Open Settings</button>}</div>}
       </section>
 
       <aside className="panel composer-right">
@@ -213,6 +217,7 @@ export function Composer({ apiBase, token, user, onPosted }: Props) {
           })}
         </div>
         <LayerInspector
+          apiBase={apiBase}
           layer={selected}
           endpoint={endpoint}
           onEndpoint={(next) => {

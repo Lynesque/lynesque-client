@@ -1,4 +1,5 @@
 import type { SceneLayer } from '../types';
+import { EmojiButton } from './CustomEmoji';
 
 interface Props {
   layer: SceneLayer | null;
@@ -6,11 +7,12 @@ interface Props {
   onEndpoint: (endpoint: 0 | 1) => void;
   onChange: (layer: SceneLayer) => void;
   onDelete: () => void;
+  apiBase: string;
 }
 
 const num = (value: string) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete }: Props) {
+export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete,apiBase }: Props) {
   if (!layer) return <div className="inspector empty">Select a layer.</div>;
   const frame = layer.keyframes[endpoint];
 
@@ -40,7 +42,7 @@ export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete
 
       {layer.kind === 'text' && (
         <>
-          <label>Text<textarea value={layer.text} onChange={(e) => onChange({ ...layer, text: e.target.value })} /></label>
+          <label>Text<span className="field-with-emoji"><textarea value={layer.text} onChange={(e) => onChange({ ...layer, text: e.target.value })} /><EmojiButton apiBase={apiBase} onInsert={(code)=>onChange({...layer,text:`${layer.text}${code}`})}/></span></label>
           <label>Font size<input type="number" min="8" max="240" value={layer.fontSize} onChange={(e) => onChange({ ...layer, fontSize: num(e.target.value) })} /></label>
         </>
       )}

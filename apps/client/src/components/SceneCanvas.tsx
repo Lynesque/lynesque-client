@@ -3,6 +3,7 @@ import { mediaUrl } from '../api';
 import type { AssetLayer, Scene, SceneLayer, TransformKeyframe } from '../types';
 import { limitMedia, resumeLimitedAudio } from '../audioLimiter';
 import { useVolume } from '../volume';
+import { RichText } from './CustomEmoji';
 
 interface Props {
   scene: Scene;
@@ -136,7 +137,7 @@ export function SceneCanvas({ scene, time, playing, apiBase, selectedLayerId, ed
                   fontWeight: layer.fontWeight || 700,
                   textAlign: layer.align || 'center'
                 }}
-              >{layer.text}</div>
+              ><RichText apiBase={apiBase} text={layer.text}/></div>
             ) : layer.assetKind === 'video' ? (
               <TimedVideo layer={layer} src={mediaUrl(apiBase, layer.assetId)} time={time} playing={playing} volume={volume} />
             ) : (
