@@ -40,12 +40,8 @@ function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile, onHash }:
         {!timeline.playing && <div className="play-overlay">▶</div>}
       </div>
       <div className="post-actions">
-        <button className={post.likedByViewer ? 'liked' : ''} onClick={async () => onPost((await toggleLike(apiBase, token, post.id)).post)}>▲</button>
-        <strong className="net-likes">{post.likeCount}</strong>
-        <button className={post.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleDislike(apiBase, token, post.id)).post)}>▼</button>
-        <button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button>
-        <button className={commentsVisible ? 'active' : ''} onClick={() => setCommentsVisible((visible) => !visible)}>{post.commentCount} comments</button>
-        <span>{post.viewCount} views</span>
+        <div className="vote-control"><button className={post.likedByViewer ? 'liked' : ''} onClick={async () => onPost((await toggleLike(apiBase, token, post.id)).post)}>▲</button><strong className="net-likes">{post.likeCount}</strong><button className={post.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleDislike(apiBase, token, post.id)).post)}>▼</button></div>
+        <div className="post-secondary"><button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button><button className={commentsVisible ? 'active' : ''} onClick={() => setCommentsVisible((visible) => !visible)}>{post.commentCount} comments</button><span>{post.viewCount} views</span></div>
       </div>
     </article>
     {commentsVisible && <aside className="comments-panel panel">
@@ -142,13 +138,11 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
         {total ? <form className="video-jump" onSubmit={(event) => { event.preventDefault(); jumpToVideo(); }}>
           <span>Video</span><input aria-label="Video number" type="number" min="1" max={total} value={videoNumber} onChange={(event) => setVideoNumber(event.target.value)} /><span>of {total}</span><button type="submit">Go</button>
         </form> : <span>No videos yet.</span>}
-        <button disabled={offset <= 0} onClick={() => load(offset - 1)}>Previous</button>
-        <button disabled={offset + 1 >= total} onClick={() => load(offset + 1)}>Next</button>
         <button onClick={() => load(offset)}>Refresh</button>
         {user.id === 'lynesque' && <button onClick={async () => { const result = await runShitTok(apiBase, token); setStatus(`shit-tok: ${JSON.stringify(result)}`); await load(0); }}>Run shit-tok</button>}
       </div>
       {status && <div className="status">{status}</div>}
-      {post && <FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} onHash={hashtag} />}
+      {post && <div className="feed-viewer"><div className="video-arrows"><button aria-label="Previous video" title="Previous video" disabled={offset<=0} onClick={()=>load(offset-1)}>▲</button><button aria-label="Next video" title="Next video" disabled={offset+1>=total} onClick={()=>load(offset+1)}>▼</button></div><FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} onHash={hashtag} /></div>}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import type { AssetRecord, BoardPost, Notification, Post, Profile, Scene, User } from './types';
+import type { AdminLog, AssetRecord, BoardPost, Notification, NotificationPreferences, Post, Profile, Report, Scene, Suspension, User } from './types';
 
 const queryApi = new URLSearchParams(window.location.search).get('api');
 export const defaultApiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:'
@@ -53,6 +53,7 @@ export async function getFeed(apiBase: string, token: string, offset: number) {
 export async function getPost(apiBase: string, token: string, postId: string) {
   return parse<{ post: Post; offset: number; total: number }>(await fetch(`${apiBase}/api/posts/${encodeURIComponent(postId)}`, { headers: authHeaders(token) }));
 }
+export async function deletePost(apiBase:string,token:string,postId:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/posts/${encodeURIComponent(postId)}`,{method:'DELETE',headers:authHeaders(token)}));}
 
 export async function createPost(apiBase: string, token: string, scene: Scene, title = 'New Video') {
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts`, {
@@ -97,6 +98,15 @@ export async function getNotifications(apiBase: string, token: string) {
 export async function markNotificationsRead(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/notifications/read`, { method: 'POST', headers: authHeaders(token) }));
 }
+export async function getNotificationSettings(apiBase:string,token:string){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{headers:authHeaders(token)}));}
+export async function setNotificationSettings(apiBase:string,token:string,preferences:NotificationPreferences){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({preferences})}));}
+export async function createReport(apiBase:string,token:string,input:{targetType:'user'|'asset';username?:string;assetId?:string;reason:string}){return parse<{report:Report}>(await fetch(`${apiBase}/api/reports`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(input)}));}
+export async function getAdminOverview(apiBase:string,token:string){return parse<{reports:Report[];suspensions:Suspension[];logs:AdminLog[]}>(await fetch(`${apiBase}/api/admin/overview`,{headers:authHeaders(token)}));}
+export async function setAdminRole(apiBase:string,token:string,userId:string,enabled:boolean){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/admin`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled})}));}
+export async function restoreAdminActions(apiBase:string,token:string,userId:string){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/restore`,{method:'POST',headers:authHeaders(token)}));}
+export async function suspendUser(apiBase:string,token:string,username:string,reason:string,hours:number){return parse<{suspension:Suspension}>(await fetch(`${apiBase}/api/admin/suspensions`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({username,reason,hours})}));}
+export async function unsuspendUser(apiBase:string,token:string,userId:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/admin/suspensions/${encodeURIComponent(userId)}/clear`,{method:'POST',headers:authHeaders(token)}));}
+export async function resolveReport(apiBase:string,token:string,reportId:string,status:'accepted'|'denied',reason:string,suspensionHours:number){return parse<{report:Report}>(await fetch(`${apiBase}/api/admin/reports/${encodeURIComponent(reportId)}/resolve`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({status,reason,suspensionHours})}));}
 
 export async function getProfile(apiBase: string, token: string, userId: string) {
   return parse<Profile>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/profile`, { headers: authHeaders(token) }));

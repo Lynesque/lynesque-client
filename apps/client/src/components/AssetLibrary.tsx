@@ -20,6 +20,7 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [section, setSection] = useState<AssetSection>(sections[0]);
   const [status, setStatus] = useState('Loading saved assets...');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -31,10 +32,11 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
     return () => { active = false; };
   }, [apiBase, token]);
 
-  const visible = useMemo(() => assets.filter((asset) => assetSection(asset) === section), [assets, section]);
+  const visible = useMemo(() => assets.filter((asset) => assetSection(asset) === section && (!query.trim() || asset.originalName.toLowerCase().includes(query.trim().toLowerCase()) || asset.id.toLowerCase().includes(query.trim().toLowerCase()))), [assets, section, query]);
 
   return <section className="asset-library">
     <h3>{title}</h3>
+    <input className="library-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search saved assets" />
     <div className="library-tabs">
       {sections.map((name) => <button type="button" className={section === name ? 'active' : ''} key={name} onClick={() => setSection(name)}>{name === 'gif' ? 'GIFs' : `${name[0].toUpperCase()}${name.slice(1)}`}</button>)}
     </div>

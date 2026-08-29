@@ -6,6 +6,7 @@ const messages: Record<Notification['kind'], string> = {
   post_like: 'liked your video',
   post_dislike: 'disliked your video',
   follow: 'followed you',
+  unfollow: 'unfollowed you',
   comment_mention: 'mentioned you in a comment',
   video_mention: 'mentioned you in video text',
   comment: 'commented on your video',
@@ -17,7 +18,16 @@ const messages: Record<Notification['kind'], string> = {
   board_mention: 'mentioned you in a Postboard post',
   board_comment_mention: 'mentioned you in a Postboard comment',
   board_comment_like: 'liked your Postboard comment',
-  board_comment_dislike: 'disliked your Postboard comment'
+  board_comment_dislike: 'disliked your Postboard comment',
+  follow_video: 'posted a new video',
+  follow_board: 'made a new Postboard post',
+  following_video_comment: 'commented on a video',
+  following_board_comment: 'commented on Postboard',
+  asset_removed: 'had one of your assets taken down',
+  content_removed: 'had some of your content taken down',
+  admin_changed: 'changed your admin status',
+  report_resolved: 'resolved your report',
+  admin_rate_limited: 'was automatically blocked from admin actions'
 };
 
 export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onProfile, onHide }: {
@@ -54,7 +64,7 @@ export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onPro
           {item.actor?.avatarAssetId ? <img src={mediaUrl(apiBase, item.actor.avatarAssetId)} alt="" /> : (item.actor?.displayName || item.actorId).slice(0, 1).toUpperCase()}
         </button>
         <button className="notification-body" onClick={() => item.postId ? onOpenPost(item.postId) : onProfile(item.actor?.id || item.actorId)}>
-          <span><strong>@{item.actor?.displayName || item.actorId}</strong> {messages[item.kind]}</span>
+          <span>{item.message || <><strong>@{item.actor?.displayName || item.actorId}</strong> {messages[item.kind]}</>}</span>
           <time>{new Date(item.createdAt).toLocaleString()}</time>
         </button>
       </div>)}

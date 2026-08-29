@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { currentUser, defaultApiBase, getNotifications, login, logout, register } from './api';
+import { currentUser, defaultApiBase, getBoardNotifications, getNotifications, login, logout, register } from './api';
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
 import { Postboard } from './components/Postboard';
+import { Settings } from './components/Settings';
+import { Admin } from './components/Admin';
 import type { User } from './types';
 import { VolumeContext } from './volume';
 
-type Tab = 'feed' | 'create' | 'profile' | 'postboard';
+type Tab = 'feed' | 'create' | 'profile' | 'postboard' | 'settings' | 'admin';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('feed');
@@ -18,6 +20,8 @@ export default function App() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [volume, setVolume] = useState(() => Math.max(0, Math.min(1, Number(localStorage.getItem('lynesque-volume') ?? 0.8))));
   const [unreadCount, setUnreadCount] = useState(0);
+  const [boardUnreadCount, setBoardUnreadCount] = useState(0);
+  const [suspensionAcknowledged, setSuspensionAcknowledged] = useState(false);
   const [feedPostId, setFeedPostId] = useState<string>();
 
   const apiBase = defaultApiBase.replace(/\/$/, '');
@@ -27,9 +31,11 @@ export default function App() {
     setToken(nextToken);
     setProfileId(nextUser.id);
     localStorage.setItem('lynesque-token', nextToken);
+    setSuspensionAcknowledged(false);
   };
 
   useEffect(() => {
+    document.documentElement.style.setProperty('--ui-scale', localStorage.getItem('lynesque-ui-scale') || '1');
     localStorage.removeItem('lynesque-api');
     if (!token) return;
     currentUser(apiBase, token).then(({ user: restored }) => acceptSession(restored, token)).catch(() => {
@@ -40,7 +46,7 @@ export default function App() {
 
   useEffect(() => {
     if (!token || !user) return;
-    const poll = () => getNotifications(apiBase, token).then((result) => setUnreadCount(result.unreadCount)).catch(() => {});
+    const poll = () => Promise.all([getNotifications(apiBase, token),getBoardNotifications(apiBase,token)]).then(([feed,board])=>{setUnreadCount(feed.unreadCount);setBoardUnreadCount(board.unreadCount);}).catch(() => {});
     poll();
     const timer = window.setInterval(poll, 5000);
     return () => window.clearInterval(timer);
@@ -78,8 +84,10 @@ export default function App() {
             Feed{unreadCount > 0 && <span className="unread-dot" title={`${unreadCount} unread notifications`} />}
           </button>
           <button className={tab === 'create' ? 'active' : ''} onClick={() => setTab('create')}>Create video</button>
-          <button className={tab === 'postboard' ? 'active' : ''} onClick={() => setTab('postboard')}>Postboard</button>
+          <button className={tab === 'postboard' ? 'active nav-feed' : 'nav-feed'} onClick={() => setTab('postboard')}>Postboard{boardUnreadCount>0&&<span className="unread-dot"/>}</button>
           <button className={tab === 'profile' && profileId === user.id ? 'active' : ''} onClick={() => openProfile(user.id)}>Profile</button>
+          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
+          {user.isAdmin&&<button className={tab==='admin'?'active':''} onClick={()=>setTab('admin')}>Admin</button>}
         </nav>
         <div className="identity">
           <label className="volume-control" title={`Volume ${Math.round(volume * 100)}%`}>
@@ -99,9 +107,12 @@ export default function App() {
         {status && <div className="connection-status">{status}</div>}
         {tab === 'feed' && <Feed apiBase={apiBase} token={token} user={user} refreshToken={refreshToken} initialPostId={feedPostId} onUnreadCount={setUnreadCount} onProfile={openProfile} />}
         {tab === 'create' && <Composer apiBase={apiBase} token={token} onPosted={() => { setRefreshToken((n) => n + 1); setTab('feed'); }} />}
-        {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
-        {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
+        {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
+        {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
+        {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user}/>} 
+        {tab==='admin'&&user.isAdmin&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>} 
       </main>
+      {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}
     </div>
     </VolumeContext.Provider>
   );
