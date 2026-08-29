@@ -3,6 +3,7 @@ import { createPost, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { AssetRecord, Scene, SceneLayer, TransformKeyframe } from '../types';
 import { LayerInspector } from './LayerInspector';
+import { AssetLibrary } from './AssetLibrary';
 import { SceneCanvas } from './SceneCanvas';
 
 interface Props {
@@ -27,6 +28,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [endpoint, setEndpoint] = useState<0 | 1>(0);
   const [status, setStatus] = useState('');
+  const [libraryVisible, setLibraryVisible] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const timeline = useTimeline(7);
 
@@ -44,31 +46,35 @@ export function Composer({ apiBase, token, onPosted }: Props) {
     setScene((current) => ({ ...current, layers: current.layers.map((layer) => layer.id === next.id ? next : layer) }));
   };
 
+  const addAssetLayer = (asset: AssetRecord) => {
+    setAssets((current) => ({ ...current, [asset.id]: asset }));
+    const id = crypto.randomUUID();
+    const layer: SceneLayer = {
+      id,
+      kind: 'asset',
+      assetId: asset.id,
+      assetKind: asset.kind,
+      mime: asset.mime,
+      start: 0,
+      end: 7,
+      muted: asset.kind === 'video' ? false : undefined,
+      keyframes: [baseFrame(0), baseFrame(7)]
+    };
+    if (asset.kind === 'audio') {
+      layer.keyframes[0] = { ...layer.keyframes[0], width: 0.01, height: 0.01 };
+      layer.keyframes[1] = { ...layer.keyframes[1], width: 0.01, height: 0.01 };
+    }
+    setScene((current) => ({ ...current, layers: [...current.layers, layer] }));
+    setSelectedId(id);
+  };
+
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     for (const file of [...files]) {
       setStatus(`Uploading ${file.name}...`);
       try {
         const { asset, deduplicated } = await uploadAsset(apiBase, token, file);
-        setAssets((current) => ({ ...current, [asset.id]: asset }));
-        const id = crypto.randomUUID();
-        const layer: SceneLayer = {
-          id,
-          kind: 'asset',
-          assetId: asset.id,
-          assetKind: asset.kind,
-          mime: asset.mime,
-          start: 0,
-          end: 7,
-          muted: asset.kind === 'video' ? false : undefined,
-          keyframes: [baseFrame(0), baseFrame(7)]
-        };
-        if (asset.kind === 'audio') {
-          layer.keyframes[0] = { ...layer.keyframes[0], width: 0.01, height: 0.01 };
-          layer.keyframes[1] = { ...layer.keyframes[1], width: 0.01, height: 0.01 };
-        }
-        setScene((current) => ({ ...current, layers: [...current.layers, layer] }));
-        setSelectedId(id);
+        addAssetLayer(asset);
         setStatus(deduplicated ? `${file.name} already existed; reused the stored copy.` : `${file.name} uploaded.`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Upload failed.');
@@ -127,6 +133,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
         <div className="composer-toolbar">
           <input ref={fileInput} hidden multiple type="file" accept="image/*,video/*,audio/*" onChange={(e) => onFiles(e.target.files)} />
           <button onClick={() => fileInput.current?.click()}>Add media</button>
+          <button className={libraryVisible ? 'active' : ''} onClick={() => setLibraryVisible((visible) => !visible)}>Library</button>
           <button onClick={addText}>Add text</button>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
           <button className="primary" onClick={publish}>Publish video</button>
@@ -165,6 +172,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
       </section>
 
       <aside className="panel composer-right">
+        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { addAssetLayer(asset); setStatus(`${asset.originalName} added from the library.`); }} />}
         <h3>Layers</h3>
         <div className="layer-list">
           {[...hydratedScene.layers].reverse().map((layer) => (

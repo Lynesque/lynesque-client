@@ -69,6 +69,8 @@ export interface Comment {
   id: string;
   userId: string;
   text: string;
+  stickerAssetId?: string;
+  sticker?: AssetRecord;
   createdAt: string;
   likeCount: number;
   upvoteCount: number;

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { addComment, getFeed, getPost, mediaUrl, runShitTok, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
 import { useTimeline } from '../useTimeline';
-import type { Post, User } from '../types';
+import type { AssetRecord, Post, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
 import { Notifications } from './Notifications';
+import { AssetLibrary } from './AssetLibrary';
 
 function Avatar({ apiBase, user, small = false }: { apiBase: string; user?: User; small?: boolean }) {
   return <span className={`mini-avatar ${small ? 'small' : ''}`}>
@@ -11,12 +12,17 @@ function Avatar({ apiBase, user, small = false }: { apiBase: string; user?: User
   </span>;
 }
 
-function FeedPost({ apiBase, token, viewerId, post, offset, onPost, onProfile }: {
-  apiBase: string; token: string; viewerId: string; post: Post; offset: number; onPost: (post: Post) => void; onProfile: (id: string) => void;
+function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile }: {
+  apiBase: string; token: string; viewerId: string; post: Post; onPost: (post: Post) => void; onProfile: (id: string) => void;
 }) {
   const timeline = useTimeline(7);
   const [comment, setComment] = useState('');
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [stickersVisible, setStickersVisible] = useState(false);
+  const [sticker, setSticker] = useState<AssetRecord | null>(null);
+  const refreshPost = async () => onPost((await getPost(apiBase, token, post.id)).post);
   return (
+    <div className={`post-with-comments ${commentsVisible ? 'comments-open' : ''}`}>
     <article className="feed-post panel">
       <div className="post-head">
         <div className="creator-line">
@@ -37,14 +43,19 @@ function FeedPost({ apiBase, token, viewerId, post, offset, onPost, onProfile }:
         <strong className="net-likes">{post.likeCount}</strong>
         <button className={post.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleDislike(apiBase, token, post.id)).post)}>▼</button>
         <button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button>
-        <span>{post.commentCount} comments</span>
+        <button className={commentsVisible ? 'active' : ''} onClick={() => setCommentsVisible((visible) => !visible)}>{post.commentCount} comments</button>
       </div>
+    </article>
+    {commentsVisible && <aside className="comments-panel panel">
+      <div className="comments-head"><h2>Comments</h2><button onClick={() => setCommentsVisible(false)}>Close</button></div>
       <div className="comments">
-        {post.comments.slice(-6).map((entry) => (
+        {post.comments.length === 0 && <p className="empty-comments">No comments yet.</p>}
+        {post.comments.map((entry) => (
           <div className="comment" key={entry.id}>
             <Avatar apiBase={apiBase} user={entry.user} small />
             <div className="comment-content">
               <span><button className="inline-user" onClick={() => onProfile(entry.user?.id || entry.userId)}>@{entry.user?.displayName || entry.userId}</button> {entry.text}</span>
+              {entry.stickerAssetId && <img className="comment-sticker" src={mediaUrl(apiBase, entry.stickerAssetId)} alt="Sticker" loading="lazy" />}
               <div className="comment-meta">
                 <time>{new Date(entry.createdAt).toLocaleString()}</time>
                 <button className={entry.likedByViewer ? 'liked' : ''} onClick={async () => onPost((await toggleCommentReaction(apiBase, token, post.id, entry.id, 'like')).post)}>▲</button>
@@ -57,22 +68,24 @@ function FeedPost({ apiBase, token, viewerId, post, offset, onPost, onProfile }:
       </div>
       <form className="comment-box" onSubmit={async (event) => {
         event.preventDefault();
-        if (!comment.trim()) return;
-        await addComment(apiBase, token, post.id, comment);
+        if (!comment.trim() && !sticker) return;
+        await addComment(apiBase, token, post.id, comment, sticker?.id);
         setComment('');
-        const result = await getFeed(apiBase, token, offset);
-        const updated = result.posts.find((candidate) => candidate.id === post.id);
-        if (updated) onPost(updated);
+        setSticker(null);
+        setStickersVisible(false);
+        await refreshPost();
       }}>
-        <input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} />
-        <button>Comment</button>
+        {sticker && <div className="selected-sticker"><img src={mediaUrl(apiBase, sticker.id)} alt="Selected sticker" /><button type="button" onClick={() => setSticker(null)}>Remove</button></div>}
+        <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
       </form>
-    </article>
+      {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
+    </aside>}
+    </div>
   );
 }
 
-export function Feed({ apiBase, token, user, isHost, refreshToken, initialPostId, onUnreadCount, onProfile }: {
-  apiBase: string; token: string; user: User; isHost: boolean; refreshToken: number; initialPostId?: string; onUnreadCount: (count: number) => void; onProfile: (id: string) => void;
+export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnreadCount, onProfile }: {
+  apiBase: string; token: string; user: User; refreshToken: number; initialPostId?: string; onUnreadCount: (count: number) => void; onProfile: (id: string) => void;
 }) {
   const [post, setPost] = useState<Post | null>(null);
   const [offset, setOffset] = useState(0);
@@ -126,10 +139,10 @@ export function Feed({ apiBase, token, user, isHost, refreshToken, initialPostId
         <button disabled={offset <= 0} onClick={() => load(offset - 1)}>Previous</button>
         <button disabled={offset + 1 >= total} onClick={() => load(offset + 1)}>Next</button>
         <button onClick={() => load(offset)}>Refresh</button>
-        {isHost && <button onClick={async () => { const result = await runShitTok(apiBase, token); setStatus(`shit-tok: ${JSON.stringify(result)}`); await load(0); }}>Run shit-tok</button>}
+        {user.id === 'lynesque' && <button onClick={async () => { const result = await runShitTok(apiBase, token); setStatus(`shit-tok: ${JSON.stringify(result)}`); await load(0); }}>Run shit-tok</button>}
       </div>
       {status && <div className="status">{status}</div>}
-      {post && <FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} offset={offset} onPost={setPost} onProfile={onProfile} />}
+      {post && <FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} />}
       </div>
     </div>
   );

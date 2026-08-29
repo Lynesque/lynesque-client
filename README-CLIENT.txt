@@ -11,18 +11,12 @@ HOW TO START
 2. Double-click run-friend.bat.
 3. The first run may install Node.js, Git, and the client dependencies. Git is
    used only to download future Lynesque client updates automatically.
-4. On the Lynesque sign-in screen, replace the Server address with the address
-   supplied by the host. It will usually look like one of these:
-
-   Same Wi-Fi:  http://192.168.1.25:8787
-   Outside Wi-Fi: https://random-words.trycloudflare.com
-
-5. Create an account or sign in.
+4. Create an account or sign in. The client connects to
+   https://lynesque.com automatically; there is no server address to enter.
 
 The host computer must be awake with run-host.bat still running. Friends do not
-need Tailscale or another VPN. The outside-Wi-Fi address changes whenever the
-host fully closes and reopens run-host.bat, so use the newest address the host
-sends. The client remembers the last server address entered.
+need Tailscale or another VPN. The lynesque.com address stays the same between
+host restarts.
 
 Do not open or forward port 8787 on the host's internet router.
 
@@ -40,3 +34,6 @@ CURRENT UPDATE
 - Profile pictures beside video creators and comments.
 - Following/follower counts and follow buttons on videos and profiles.
 - Mutually exclusive upvotes/downvotes displayed as one net-like score.
+- Permanent lynesque.com connection with no server field.
+- Notification and comments drawers, including comment reactions/timestamps.
+- Image/GIF comment stickers and a saved-asset creator library.

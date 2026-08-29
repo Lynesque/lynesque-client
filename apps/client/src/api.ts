@@ -1,8 +1,9 @@
 import type { AssetRecord, Notification, Post, Profile, Scene, User } from './types';
 
-export const defaultApiBase = window.location.protocol === 'http:' || window.location.protocol === 'https:'
+const queryApi = new URLSearchParams(window.location.search).get('api');
+export const defaultApiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:'
   ? window.location.origin
-  : 'http://127.0.0.1:8787';
+  : queryApi || 'https://lynesque.com').replace(/\/$/, '');
 
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
@@ -35,14 +36,14 @@ export async function logout(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', headers: authHeaders(token) }));
 }
 
-export async function health(apiBase: string) {
-  return parse<{ ok: boolean; isHost: boolean }>(await fetch(`${apiBase}/api/health`));
-}
-
 export async function uploadAsset(apiBase: string, token: string, file: File) {
   return parse<{ asset: AssetRecord; deduplicated: boolean }>(await fetch(`${apiBase}/api/assets`, {
     method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }, body: file
   }));
+}
+
+export async function getAssets(apiBase: string, token: string) {
+  return parse<{ assets: AssetRecord[] }>(await fetch(`${apiBase}/api/assets`, { headers: authHeaders(token) }));
 }
 
 export async function getFeed(apiBase: string, token: string, offset: number) {
@@ -71,9 +72,9 @@ export async function toggleFollow(apiBase: string, token: string, userId: strin
   return parse<{ user: User }>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/follow`, { method: 'POST', headers: authHeaders(token) }));
 }
 
-export async function addComment(apiBase: string, token: string, postId: string, text: string) {
+export async function addComment(apiBase: string, token: string, postId: string, text: string, stickerAssetId?: string) {
   return parse<{ comment: unknown }>(await fetch(`${apiBase}/api/posts/${postId}/comments`, {
-    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ text })
+    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ text, stickerAssetId })
   }));
 }
 
