@@ -57,6 +57,14 @@ export async function toggleLike(apiBase: string, token: string, postId: string)
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts/${postId}/like`, { method: 'POST', headers: authHeaders(token) }));
 }
 
+export async function toggleDislike(apiBase: string, token: string, postId: string) {
+  return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts/${postId}/dislike`, { method: 'POST', headers: authHeaders(token) }));
+}
+
+export async function toggleFollow(apiBase: string, token: string, userId: string) {
+  return parse<{ user: User }>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/follow`, { method: 'POST', headers: authHeaders(token) }));
+}
+
 export async function addComment(apiBase: string, token: string, postId: string, text: string) {
   return parse<{ comment: unknown }>(await fetch(`${apiBase}/api/posts/${postId}/comments`, {
     method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ text })

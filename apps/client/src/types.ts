@@ -59,6 +59,9 @@ export interface User {
   displayName: string;
   isBot: boolean;
   avatarAssetId?: string;
+  followerCount: number;
+  followingCount: number;
+  followedByViewer: boolean;
   createdAt?: string;
 }
 
@@ -77,8 +80,11 @@ export interface Post {
   scene: Scene;
   likes: string[];
   likeCount: number;
+  upvoteCount: number;
+  dislikeCount: number;
   commentCount: number;
   likedByViewer: boolean;
+  dislikedByViewer: boolean;
   comments: Comment[];
   createdAt: string;
 }

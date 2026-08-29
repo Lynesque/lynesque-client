@@ -32,3 +32,11 @@ AUTOMATIC UPDATES
 run-friend.bat checks https://github.com/Lynesque/lynesque-client for updates
 every time it starts. This works even if the first copy was downloaded as a ZIP:
 the launcher connects the extracted folder to the repository on its first run.
+
+CURRENT UPDATE
+--------------
+
+- Master volume slider with protection against only extremely loud peaks.
+- Profile pictures beside video creators and comments.
+- Following/follower counts and follow buttons on videos and profiles.
+- Mutually exclusive upvotes/downvotes displayed as one net-like score.

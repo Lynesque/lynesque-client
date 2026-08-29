@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { mediaUrl } from '../api';
 import type { AssetLayer, Scene, SceneLayer, TransformKeyframe } from '../types';
+import { limitMedia, resumeLimitedAudio } from '../audioLimiter';
+import { useVolume } from '../volume';
 
 interface Props {
   scene: Scene;
@@ -30,11 +32,13 @@ function transformAt(layer: SceneLayer, time: number): TransformKeyframe {
   };
 }
 
-function TimedVideo({ layer, src, time, playing }: { layer: AssetLayer; src: string; time: number; playing: boolean }) {
+function TimedVideo({ layer, src, time, playing, volume }: { layer: AssetLayer; src: string; time: number; playing: boolean; volume: number }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    limitMedia(el);
+    el.volume = volume;
     const local = Math.max(0, time - layer.start);
     const duration = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
     const desired = duration ? local % duration : local;
@@ -42,17 +46,19 @@ function TimedVideo({ layer, src, time, playing }: { layer: AssetLayer; src: str
       try { el.currentTime = desired; } catch (_) {}
     }
     el.muted = Boolean(layer.muted);
-    if (playing) el.play().catch(() => {});
+    if (playing) { resumeLimitedAudio(); el.play().catch(() => {}); }
     else el.pause();
-  }, [time, playing, layer.start, layer.muted]);
-  return <video ref={ref} src={src} playsInline preload="metadata" />;
+  }, [time, playing, layer.start, layer.muted, volume]);
+  return <video ref={ref} src={src} crossOrigin="anonymous" playsInline preload="metadata" />;
 }
 
-function TimedAudio({ layer, src, time, playing }: { layer: AssetLayer; src: string; time: number; playing: boolean }) {
+function TimedAudio({ layer, src, time, playing, volume }: { layer: AssetLayer; src: string; time: number; playing: boolean; volume: number }) {
   const ref = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    limitMedia(el);
+    el.volume = volume;
     const active = time >= layer.start && time <= layer.end;
     const local = Math.max(0, time - layer.start);
     const duration = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
@@ -60,13 +66,14 @@ function TimedAudio({ layer, src, time, playing }: { layer: AssetLayer; src: str
     if (Math.abs((el.currentTime || 0) - desired) > 0.2) {
       try { el.currentTime = desired; } catch (_) {}
     }
-    if (playing && active) el.play().catch(() => {});
+    if (playing && active) { resumeLimitedAudio(); el.play().catch(() => {}); }
     else el.pause();
-  }, [time, playing, layer.start, layer.end]);
-  return <audio ref={ref} src={src} preload="metadata" />;
+  }, [time, playing, layer.start, layer.end, volume]);
+  return <audio ref={ref} src={src} crossOrigin="anonymous" preload="metadata" />;
 }
 
 export function SceneCanvas({ scene, time, playing, apiBase, selectedLayerId, editingEndpoint = 0, onSelect, onMoveEndpoint }: Props) {
+  const volume = useVolume();
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLayers = useMemo(() => scene.layers.filter((layer) => time >= layer.start && time <= layer.end), [scene.layers, time]);
 
@@ -98,7 +105,7 @@ export function SceneCanvas({ scene, time, playing, apiBase, selectedLayerId, ed
   return (
     <div ref={containerRef} className="scene-canvas" style={{ background: scene.background || '#000' }}>
       {scene.layers.filter((layer) => layer.kind === 'asset' && layer.assetKind === 'audio').map((layer) => (
-        <TimedAudio key={layer.id} layer={layer as AssetLayer} src={mediaUrl(apiBase, (layer as AssetLayer).assetId)} time={time} playing={playing} />
+        <TimedAudio key={layer.id} layer={layer as AssetLayer} src={mediaUrl(apiBase, (layer as AssetLayer).assetId)} time={time} playing={playing} volume={volume} />
       ))}
       {activeLayers.filter((layer) => !(layer.kind === 'asset' && layer.assetKind === 'audio')).map((layer) => {
         const frame = transformAt(layer, time);
@@ -131,7 +138,7 @@ export function SceneCanvas({ scene, time, playing, apiBase, selectedLayerId, ed
                 }}
               >{layer.text}</div>
             ) : layer.assetKind === 'video' ? (
-              <TimedVideo layer={layer} src={mediaUrl(apiBase, layer.assetId)} time={time} playing={playing} />
+              <TimedVideo layer={layer} src={mediaUrl(apiBase, layer.assetId)} time={time} playing={playing} volume={volume} />
             ) : (
               <img src={mediaUrl(apiBase, layer.assetId)} draggable={false} />
             )}

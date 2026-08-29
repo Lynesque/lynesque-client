@@ -4,6 +4,7 @@ import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
 import type { User } from './types';
+import { VolumeContext } from './volume';
 
 type Tab = 'feed' | 'create' | 'profile';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [isHost, setIsHost] = useState(false);
   const [status, setStatus] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
+  const [volume, setVolume] = useState(() => Math.max(0, Math.min(1, Number(localStorage.getItem('lynesque-volume') ?? 0.8))));
 
   const normalizedApi = apiBase.replace(/\/$/, '');
 
@@ -54,6 +56,7 @@ export default function App() {
   }
 
   return (
+    <VolumeContext.Provider value={volume}>
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">lynesque.com <small>totally better than</small></div>
@@ -63,6 +66,14 @@ export default function App() {
           <button className={tab === 'profile' && profileId === user.id ? 'active' : ''} onClick={() => openProfile(user.id)}>Profile</button>
         </nav>
         <div className="identity">
+          <label className="volume-control" title={`Volume ${Math.round(volume * 100)}%`}>
+            <span>🔊</span>
+            <input aria-label="Volume" type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => {
+              const next = Number(event.target.value);
+              setVolume(next);
+              localStorage.setItem('lynesque-volume', String(next));
+            }} />
+          </label>
           <button className="user-link" onClick={() => openProfile(user.id)}>@{user.displayName}</button>
           <button onClick={signOut}>Log out</button>
         </div>
@@ -75,6 +86,7 @@ export default function App() {
         {tab === 'profile' && <ProfileView apiBase={normalizedApi} token={token} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} />}
       </main>
     </div>
+    </VolumeContext.Provider>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getProfile, mediaUrl, updateAvatar, uploadAsset } from '../api';
+import { getProfile, mediaUrl, toggleFollow, updateAvatar, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { Post, Profile, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
@@ -51,8 +51,12 @@ export function ProfileView({ apiBase, token, userId, onUserChanged, onProfile: 
         </div>
         <div>
           <h1>@{profile.user.displayName}</h1>
-          <p>{profile.totalLikes} total likes · {profile.posts.length} videos</p>
+          <p>{profile.user.followerCount} followers · {profile.user.followingCount} following · {profile.totalLikes} total likes · {profile.posts.length} videos</p>
         </div>
+        {!profile.isOwnProfile && <button className={profile.user.followedByViewer ? 'following profile-follow' : 'follow profile-follow'} onClick={async () => {
+          const { user } = await toggleFollow(apiBase, token, profile.user.id);
+          setProfile({ ...profile, user });
+        }}>{profile.user.followedByViewer ? 'Following' : 'Follow'}</button>}
         {profile.isOwnProfile && <div className="profile-edit">
           <input ref={fileInput} hidden type="file" accept="image/*" onChange={(event) => changeAvatar(event.target.files?.[0])} />
           <button onClick={() => fileInput.current?.click()}>Change profile picture</button>
