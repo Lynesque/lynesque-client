@@ -1,0 +1,8 @@
+const cleanHex=(value:string,fallback:string)=>/^#[0-9a-f]{6}$/i.test(value)?value:fallback;
+const mix=(hex:string,amount:number)=>{const value=Number.parseInt(hex.slice(1),16);const channels=[value>>16,(value>>8)&255,value&255].map((channel)=>Math.max(0,Math.min(255,Math.round(channel+(amount>=0?(255-channel)*amount:channel*amount)))));return `#${channels.map((channel)=>channel.toString(16).padStart(2,'0')).join('')}`;};
+export const themeSettings=()=>({base:cleanHex(localStorage.getItem('lynesque-theme-base')||'','#0c0c0e'),accent:cleanHex(localStorage.getItem('lynesque-theme-accent')||'','#9485ff'),text:cleanHex(localStorage.getItem('lynesque-theme-text')||'','#f4f4f4')});
+export function applyTheme(input=themeSettings()){
+ const root=document.documentElement;const base=cleanHex(input.base,'#0c0c0e'),accent=cleanHex(input.accent,'#9485ff'),text=cleanHex(input.text,'#f4f4f4');
+ root.style.setProperty('--theme-bg',base);root.style.setProperty('--theme-panel',mix(base,.035));root.style.setProperty('--theme-field',mix(base,.07));root.style.setProperty('--theme-button',mix(base,.11));root.style.setProperty('--theme-button-hover',mix(base,.17));root.style.setProperty('--theme-border',mix(base,.22));root.style.setProperty('--theme-text',text);root.style.setProperty('--theme-muted',mix(text,-.48));root.style.setProperty('--theme-accent',accent);
+}
+export function saveTheme(input:{base:string;accent:string;text:string}){localStorage.setItem('lynesque-theme-base',input.base);localStorage.setItem('lynesque-theme-accent',input.accent);localStorage.setItem('lynesque-theme-text',input.text);applyTheme(input);}

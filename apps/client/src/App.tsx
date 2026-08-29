@@ -9,6 +9,7 @@ import { Admin } from './components/Admin';
 import type { User } from './types';
 import { VolumeContext } from './volume';
 import { UserAvatar, UserName } from './components/UserIdentity';
+import { applyTheme } from './theme';
 
 type Tab = 'feed' | 'create' | 'profile' | 'postboard' | 'settings' | 'admin';
 
@@ -23,6 +24,7 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [boardUnreadCount, setBoardUnreadCount] = useState(0);
   const [suspensionAcknowledged, setSuspensionAcknowledged] = useState(false);
+  const [unverifiedAcknowledged,setUnverifiedAcknowledged]=useState(false);
   const [feedPostId, setFeedPostId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get('video') || undefined);
   const [apiBase, setApiBase] = useState('');
 
@@ -32,10 +34,12 @@ export default function App() {
     setProfileId(nextUser.id);
     localStorage.setItem('lynesque-token', nextToken);
     setSuspensionAcknowledged(false);
+    setUnverifiedAcknowledged(false);
   };
 
   useEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', localStorage.getItem('lynesque-ui-scale') || '1');
+    applyTheme();
     localStorage.removeItem('lynesque-api');
     resolveApiBase().then(setApiBase);
   }, []);
@@ -103,7 +107,7 @@ export default function App() {
               localStorage.setItem('lynesque-volume', String(next));
             }} />
           </label>
-          <button className="user-link topbar-user" onClick={() => openProfile(user.id)}><UserAvatar apiBase={apiBase} user={user} small/><UserName user={user}/></button>
+          <button className="user-link topbar-user" onClick={() => openProfile(user.id)}><UserAvatar apiBase={apiBase} user={user} small/><UserName compact user={user}/></button>
           <button onClick={signOut}>Log out</button>
         </div>
       </header>
@@ -111,13 +115,14 @@ export default function App() {
       <main>
         {status && <div className="connection-status">{status}</div>}
         {tab === 'feed' && <Feed apiBase={apiBase} token={token} user={user} refreshToken={refreshToken} initialPostId={feedPostId} onUnreadCount={setUnreadCount} onProfile={openProfile} />}
-        {tab === 'create' && <Composer apiBase={apiBase} token={token} isAdmin={user.isAdmin} onPosted={() => { setRefreshToken((n) => n + 1); setTab('feed'); }} />}
+        {tab === 'create' && <Composer apiBase={apiBase} token={token} user={user} onPosted={(pending) => { setRefreshToken((n) => n + 1); if(!pending)setTab('feed'); }} />}
         {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
         {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
         {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user}/>} 
         {tab==='admin'&&user.isAdmin&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>} 
       </main>
       {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}
+      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet.</p><p>If an admin approves one of your reviewed uploads, your account becomes verified automatically. A denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
     </div>
     </VolumeContext.Provider>
   );

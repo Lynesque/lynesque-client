@@ -19,6 +19,8 @@ export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete
     frames[endpoint] = { ...frame, ...patch };
     onChange({ ...layer, keyframes: frames } as SceneLayer);
   };
+  const syncFrame=(key:keyof typeof frame)=>{const frames=[...layer.keyframes] as [typeof frame,typeof frame];frames[endpoint===0?1:0]={...frames[endpoint===0?1:0],[key]:frames[endpoint][key]};onChange({...layer,keyframes:frames} as SceneLayer);};
+  const field=(label:string,key:'x'|'y'|'width'|'height'|'rotation'|'opacity',options:{min?:number;max?:number;step:number})=><label className="sync-field"><span>{label}<button type="button" title={`Copy ${label} to the ${endpoint===0?'end':'start'} transform`} onClick={()=>syncFrame(key)}>Sync</button></span><input type="number" min={options.min} max={options.max} step={options.step} value={key==='rotation'?Math.round(frame[key]||0):(frame[key]??1).toFixed(2)} onChange={(e)=>patchFrame({[key]:num(e.target.value)})}/></label>;
 
   const patchTiming = (start: number, end: number) => {
     const cleanStart = Math.max(0, Math.min(7, start));
@@ -58,12 +60,7 @@ export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete
       </div>
 
       <div className="two-col">
-        <label>X<input type="number" step="0.01" value={frame.x.toFixed(2)} onChange={(e) => patchFrame({ x: num(e.target.value) })} /></label>
-        <label>Y<input type="number" step="0.01" value={frame.y.toFixed(2)} onChange={(e) => patchFrame({ y: num(e.target.value) })} /></label>
-        <label>Width<input type="number" min="0.01" step="0.01" value={frame.width.toFixed(2)} onChange={(e) => patchFrame({ width: num(e.target.value) })} /></label>
-        <label>Height<input type="number" min="0.01" step="0.01" value={frame.height.toFixed(2)} onChange={(e) => patchFrame({ height: num(e.target.value) })} /></label>
-        <label>Rotation<input type="number" step="1" value={Math.round(frame.rotation)} onChange={(e) => patchFrame({ rotation: num(e.target.value) })} /></label>
-        <label>Opacity<input type="number" min="0" max="1" step="0.05" value={(frame.opacity ?? 1).toFixed(2)} onChange={(e) => patchFrame({ opacity: num(e.target.value) })} /></label>
+        {field('X','x',{step:.01})}{field('Y','y',{step:.01})}{field('Width','width',{min:.01,step:.01})}{field('Height','height',{min:.01,step:.01})}{field('Rotation','rotation',{step:1})}{field('Opacity','opacity',{min:0,max:1,step:.05})}
       </div>
       <p className="hint">Drag the layer in the preview to move whichever transform endpoint is selected.</p>
     </div>

@@ -1,4 +1,5 @@
 export type AssetKind = 'image' | 'video' | 'audio';
+export type AccountStatus = 'verified' | 'default' | 'unverified';
 
 export interface AssetRecord {
   id: string;
@@ -9,6 +10,8 @@ export interface AssetRecord {
   bytes: number;
   createdAt: string;
   uploaderId?: string;
+  moderationStatus?: 'public' | 'pending';
+  uploader?: User;
 }
 
 export interface TransformKeyframe {
@@ -67,6 +70,7 @@ export interface User {
   isAdmin: boolean;
   isMegaAdmin: boolean;
   isVerified: boolean;
+  accountStatus: AccountStatus;
   adminBlockedUntil?: string;
   suspension?: { reason: string; until: string };
 }
@@ -86,7 +90,7 @@ export interface Comment {
   user?: User;
 }
 
-export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_removed'|'content_removed'|'admin_changed'|'report_resolved'|'admin_rate_limited'|'automatic_suspension';
+export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_removed'|'content_removed'|'admin_changed'|'report_resolved'|'review_resolved'|'admin_rate_limited'|'automatic_suspension';
 export type NotificationPreferences = Record<NotificationKind, boolean>;
 
 export interface Notification {
@@ -104,7 +108,8 @@ export interface Notification {
 }
 
 export interface Suspension { userId:string;reason:string;until:string;adminId:string;createdAt:string;updatedAt:string;user?:User; }
-export interface Report { id:string;reporterId:string;targetType:'user'|'asset';targetUserId?:string;assetId?:string;reason:string;status:'pending'|'accepted'|'denied';createdAt:string;resolvedAt?:string;resolutionReason?:string;reporter?:User;targetUser?:User;asset?:AssetRecord; }
+export type ReportTargetType='user'|'asset'|'post'|'comment'|'board_post'|'board_comment';
+export interface Report { id:string;reporterId:string;targetType:ReportTargetType;targetUserId?:string;assetId?:string;postId?:string;boardPostId?:string;commentId?:string;reason:string;status:'pending'|'accepted'|'denied';createdAt:string;resolvedAt?:string;resolutionReason?:string;reporter?:User;targetUser?:User;asset?:AssetRecord;post?:Post;comment?:Comment;boardPost?:BoardPost;boardComment?:Comment; }
 export interface AdminLog { id:string;adminId:string;action:string;targetUserId?:string;reason?:string;createdAt:string;admin?:User;targetUser?:User; }
 
 export interface Post {
@@ -122,18 +127,23 @@ export interface Post {
   likedByViewer: boolean;
   dislikedByViewer: boolean;
   comments: Comment[];
+  commentsTotal: number;
+  commentsHasMore: boolean;
+  moderationStatus?: 'public'|'pending';
   createdAt: string;
 }
 
 export interface BoardPost {
   id: string; authorId: string; author: User; text: string; stickerAssetId?: string; sticker?: AssetRecord;
   likes: string[]; dislikes: string[]; likeCount: number; likedByViewer: boolean; dislikedByViewer: boolean;
-  comments: Comment[]; createdAt: string;
+  comments: Comment[]; commentsTotal:number;commentsHasMore:boolean;createdAt: string;
 }
 
 export interface Profile {
   user: User;
   totalLikes: number;
   posts: Post[];
+  total:number;
+  hasMore:boolean;
   isOwnProfile: boolean;
 }

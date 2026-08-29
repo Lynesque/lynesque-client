@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { adminDeletePost, deletePost, getProfile, restoreAdminActions, searchUsers, setAdminRole, setVerified, toggleFollow, updateAvatar, uploadAsset } from '../api';
+import { adminDeletePost, deletePost, getProfile, restoreAdminActions, searchUsers, setAccountStatus, setAdminRole, toggleFollow, updateAvatar, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { Post, Profile, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
@@ -16,11 +16,12 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
   const fileInput = useRef<HTMLInputElement>(null);
   const timeline = useTimeline(7);
 
-  const load = async () => {
+  const load = async (append=false) => {
     try {
-      const result = await getProfile(apiBase, token, userId);
-      setProfile(result);
-      setSelected((current) => result.posts.find((post) => post.id === current?.id) || result.posts[0] || null);
+      const result = await getProfile(apiBase, token, userId,append?(profile?.posts.length||0):0,20);
+      const combined=append&&profile?{...result,posts:[...profile.posts,...result.posts.filter((post)=>!profile.posts.some((item)=>item.id===post.id))]}:result;
+      setProfile(combined);
+      setSelected((current) => combined.posts.find((post) => post.id === current?.id) || combined.posts[0] || null);
       setStatus('');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Profile failed to load.');
@@ -31,6 +32,7 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
 
   const changeAvatar = async (file?: File) => {
     if (!file) return;
+    if(viewer.accountStatus==='unverified'){setStatus('Profile pictures are disabled while your account is unverified. Upload an asset or video for review first.');return;}
     const displayName = window.prompt('Name this asset so it can be found in the library:', file.name.replace(/\.[^.]+$/, '') || 'Profile picture');
     if (displayName === null || !displayName.trim()) return;
     setStatus('Uploading profile picture...');
@@ -63,9 +65,9 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
         }}>{profile.user.followedByViewer ? 'Following' : 'Follow'}</button>}
         {profile.isOwnProfile && <div className="profile-edit">
           <input ref={fileInput} hidden type="file" accept="image/*" onChange={(event) => changeAvatar(event.target.files?.[0])} />
-          <button onClick={() => fileInput.current?.click()}>Change profile picture</button>
+          <button disabled={viewer.accountStatus==='unverified'} onClick={() => fileInput.current?.click()}>Change profile picture</button>
         </div>}
-        {viewer.isAdmin&&<div className="profile-admin-controls"><button onClick={async()=>{await setVerified(apiBase,token,profile.user.id,!profile.user.isVerified);await load();}}>{profile.user.isVerified?'Remove verification':'Verify user'}</button>{viewer.isMegaAdmin&&profile.user.id!==viewer.id&&<><button onClick={async()=>{await setAdminRole(apiBase,token,profile.user.id,!profile.user.isAdmin);await load();}}>{profile.user.isAdmin?'Remove admin':'Make admin'}</button>{profile.user.adminBlockedUntil&&<button onClick={async()=>{await restoreAdminActions(apiBase,token,profile.user.id);await load();}}>Restore admin actions</button>}</>}</div>}
+        {viewer.isAdmin&&<div className="profile-admin-controls"><label>Account status<select value={profile.user.accountStatus} onChange={async(event)=>{await setAccountStatus(apiBase,token,profile.user.id,event.target.value as User['accountStatus']);await load();}}><option value="verified">Verified</option><option value="default">Default</option><option value="unverified">Unverified</option></select></label>{viewer.isMegaAdmin&&profile.user.id!==viewer.id&&<><button onClick={async()=>{await setAdminRole(apiBase,token,profile.user.id,!profile.user.isAdmin);await load();}}>{profile.user.isAdmin?'Remove admin':'Make admin'}</button>{profile.user.adminBlockedUntil&&<button onClick={async()=>{await restoreAdminActions(apiBase,token,profile.user.id);await load();}}>Restore admin actions</button>}</>}</div>}
       </section>
       {status && <div className="status">{status}</div>}
       <div className="profile-content">
@@ -74,9 +76,10 @@ export function ProfileView({ apiBase, token, viewer, userId, onUserChanged, onP
           {profile.posts.length === 0 && <p>No videos yet.</p>}
           {profile.posts.map((post, index) => (
             <button className={selected?.id === post.id ? 'active' : ''} key={post.id} onClick={() => { setSelected(post); timeline.seek(0); timeline.setPlaying(false); }}>
-              {post.title} · LYN-{post.id.slice(0,8).toUpperCase()} · {post.likeCount} likes · {new Date(post.createdAt).toLocaleDateString()}
+              {post.title} · LYN-{post.id.slice(0,8).toUpperCase()} · {post.likeCount} likes · {new Date(post.createdAt).toLocaleDateString()}{post.moderationStatus==='pending'?' · AWAITING REVIEW':''}
             </button>
           ))}
+          {profile.hasMore&&<button onClick={()=>load(true)}>Load more videos</button>}
         </aside>
         {selected && <section className="profile-player panel">
           <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { createPost, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
-import type { AssetRecord, Scene, SceneLayer, TransformKeyframe } from '../types';
+import type { AssetRecord, Scene, SceneLayer, TransformKeyframe,User } from '../types';
 import { LayerInspector } from './LayerInspector';
 import { AssetLibrary } from './AssetLibrary';
 import { SceneCanvas } from './SceneCanvas';
@@ -9,8 +9,8 @@ import { SceneCanvas } from './SceneCanvas';
 interface Props {
   apiBase: string;
   token: string;
-  isAdmin: boolean;
-  onPosted: () => void;
+  user:User;
+  onPosted: (pending:boolean) => void;
 }
 
 const baseFrame = (time: number): TransformKeyframe => ({
@@ -24,7 +24,7 @@ const baseFrame = (time: number): TransformKeyframe => ({
 });
 const MAX_ASSET_LAYERS = 20;
 
-export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
+export function Composer({ apiBase, token, user, onPosted }: Props) {
   const [scene, setScene] = useState<Scene>({ version: 1, duration: 7, background: '#000000', layers: [] });
   const [assets, setAssets] = useState<Record<string, AssetRecord>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,10 +86,10 @@ export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
       if (!displayName.trim()) { setStatus(`${file.name} was skipped because its name was empty.`); continue; }
       setStatus(`Uploading ${displayName.trim()}...`);
       try {
-        const { asset, deduplicated } = await uploadAsset(apiBase, token, file, displayName.trim());
+        const { asset, deduplicated,pending,message } = await uploadAsset(apiBase, token, file, displayName.trim());
         if (!addAssetLayer(asset)) break;
         assetCount += 1;
-        setStatus(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : `${displayName.trim()} uploaded.`);
+        setStatus(message||(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : pending?`${displayName.trim()} is awaiting admin review.`:`${displayName.trim()} uploaded.`));
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Upload failed.');
       }
@@ -138,14 +138,14 @@ export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
     if (!scene.layers.length) return setStatus('Put something in the video first.');
     setStatus('Posting...');
     try {
-      await createPost(apiBase, token, scene, title || 'New Video');
-      setStatus('Video published.');
+      const result=await createPost(apiBase, token, scene, title || 'New Video');
+      setStatus(result.message||(result.pending?'Video sent for admin review.':'Video published.'));
       setScene({ version: 1, duration: 7, background: '#000000', layers: [] });
       setTitle('');
       setSelectedId(null);
       timeline.seek(0);
       timeline.setPlaying(false);
-      onPosted();
+      onPosted(Boolean(result.pending));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Post failed.');
     }
@@ -154,6 +154,7 @@ export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
   return (
     <div className="composer-layout">
       <section className="composer-left panel">
+        {user.accountStatus==='unverified'&&<div className="review-notice">Your account is unverified. Assets and videos you upload are private and sent to admins for review. Approval verifies your account; denial deletes the reviewed item.</div>}
         <div className="composer-toolbar">
           <input ref={fileInput} hidden multiple type="file" accept="image/*,video/*,audio/*" onChange={(e) => onFiles(e.target.files)} />
           <button onClick={() => fileInput.current?.click()}>Add media</button>
@@ -198,7 +199,7 @@ export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
       </section>
 
       <aside className="panel composer-right">
-        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={isAdmin} sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
+        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={user.isAdmin} viewer={user} allowPending sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
         <h3>Layers</h3>
         <div className="layer-list">
           {[...hydratedScene.layers].reverse().map((layer) => {
