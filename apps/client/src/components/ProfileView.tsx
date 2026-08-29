@@ -4,8 +4,8 @@ import { useTimeline } from '../useTimeline';
 import type { Post, Profile, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
 
-export function ProfileView({ apiBase, token, userId, onUserChanged, onProfile: _onProfile }: {
-  apiBase: string; token: string; userId: string; onUserChanged: (user: User) => void; onProfile: (id: string) => void;
+export function ProfileView({ apiBase, token, userId, onUserChanged, onProfile: _onProfile, onOpenPost }: {
+  apiBase: string; token: string; userId: string; onUserChanged: (user: User) => void; onProfile: (id: string) => void; onOpenPost: (postId: string) => void;
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selected, setSelected] = useState<Post | null>(null);
@@ -81,6 +81,7 @@ export function ProfileView({ apiBase, token, userId, onUserChanged, onProfile: 
           <div className="post-actions">
             <span>{selected.likeCount} likes</span><span>{selected.commentCount} comments</span>
             <button onClick={() => timeline.setPlaying(!timeline.playing)}>{timeline.playing ? 'Pause' : 'Play'}</button>
+            <button className="primary" onClick={() => onOpenPost(selected.id)}>Open in feed</button>
           </div>
         </section>}
       </div>

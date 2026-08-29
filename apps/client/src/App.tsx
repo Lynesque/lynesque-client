@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currentUser, defaultApiBase, health, login, logout, register } from './api';
+import { currentUser, defaultApiBase, getNotifications, health, login, logout, register } from './api';
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
@@ -18,6 +18,8 @@ export default function App() {
   const [status, setStatus] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
   const [volume, setVolume] = useState(() => Math.max(0, Math.min(1, Number(localStorage.getItem('lynesque-volume') ?? 0.8))));
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [feedPostId, setFeedPostId] = useState<string>();
 
   const normalizedApi = apiBase.replace(/\/$/, '');
 
@@ -38,9 +40,22 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!token || !user) return;
+    const poll = () => getNotifications(normalizedApi, token).then((result) => setUnreadCount(result.unreadCount)).catch(() => {});
+    poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => window.clearInterval(timer);
+  }, [normalizedApi, token, user?.id]);
+
   const openProfile = (userId: string) => {
     setProfileId(userId);
     setTab('profile');
+  };
+
+  const openFeedPost = (postId?: string) => {
+    setFeedPostId(postId);
+    setTab('feed');
   };
 
   const signOut = async () => {
@@ -61,7 +76,9 @@ export default function App() {
       <header className="topbar">
         <div className="brand">lynesque.com <small>totally better than</small></div>
         <nav>
-          <button className={tab === 'feed' ? 'active' : ''} onClick={() => setTab('feed')}>Feed</button>
+          <button className={tab === 'feed' ? 'active nav-feed' : 'nav-feed'} onClick={() => openFeedPost()}>
+            Feed{unreadCount > 0 && <span className="unread-dot" title={`${unreadCount} unread notifications`} />}
+          </button>
           <button className={tab === 'create' ? 'active' : ''} onClick={() => setTab('create')}>Create video</button>
           <button className={tab === 'profile' && profileId === user.id ? 'active' : ''} onClick={() => openProfile(user.id)}>Profile</button>
         </nav>
@@ -81,9 +98,9 @@ export default function App() {
 
       <main>
         {status && <div className="connection-status">{status}</div>}
-        {tab === 'feed' && <Feed apiBase={normalizedApi} token={token} user={user} isHost={isHost} refreshToken={refreshToken} onProfile={openProfile} />}
+        {tab === 'feed' && <Feed apiBase={normalizedApi} token={token} user={user} isHost={isHost} refreshToken={refreshToken} initialPostId={feedPostId} onUnreadCount={setUnreadCount} onProfile={openProfile} />}
         {tab === 'create' && <Composer apiBase={normalizedApi} token={token} onPosted={() => { setRefreshToken((n) => n + 1); setTab('feed'); }} />}
-        {tab === 'profile' && <ProfileView apiBase={normalizedApi} token={token} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} />}
+        {tab === 'profile' && <ProfileView apiBase={normalizedApi} token={token} userId={profileId || user.id} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
       </main>
     </div>
     </VolumeContext.Provider>

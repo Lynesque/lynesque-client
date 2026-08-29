@@ -70,7 +70,25 @@ export interface Comment {
   userId: string;
   text: string;
   createdAt: string;
+  likeCount: number;
+  upvoteCount: number;
+  dislikeCount: number;
+  likedByViewer: boolean;
+  dislikedByViewer: boolean;
   user?: User;
+}
+
+export type NotificationKind = 'post_like' | 'post_dislike' | 'follow' | 'comment_mention' | 'video_mention' | 'comment' | 'comment_like' | 'comment_dislike';
+
+export interface Notification {
+  id: string;
+  actorId: string;
+  actor?: User;
+  kind: NotificationKind;
+  postId?: string;
+  commentId?: string;
+  createdAt: string;
+  readAt?: string;
 }
 
 export interface Post {

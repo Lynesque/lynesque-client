@@ -1,4 +1,4 @@
-import type { AssetRecord, Post, Profile, Scene, User } from './types';
+import type { AssetRecord, Notification, Post, Profile, Scene, User } from './types';
 
 export const defaultApiBase = 'http://127.0.0.1:8787';
 
@@ -47,6 +47,10 @@ export async function getFeed(apiBase: string, token: string, offset: number) {
   return parse<{ posts: Post[]; offset: number; total: number; hasMore: boolean }>(await fetch(`${apiBase}/api/feed?offset=${offset}&limit=1`, { headers: authHeaders(token) }));
 }
 
+export async function getPost(apiBase: string, token: string, postId: string) {
+  return parse<{ post: Post; offset: number; total: number }>(await fetch(`${apiBase}/api/posts/${encodeURIComponent(postId)}`, { headers: authHeaders(token) }));
+}
+
 export async function createPost(apiBase: string, token: string, scene: Scene) {
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts`, {
     method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ scene })
@@ -69,6 +73,18 @@ export async function addComment(apiBase: string, token: string, postId: string,
   return parse<{ comment: unknown }>(await fetch(`${apiBase}/api/posts/${postId}/comments`, {
     method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ text })
   }));
+}
+
+export async function toggleCommentReaction(apiBase: string, token: string, postId: string, commentId: string, reaction: 'like' | 'dislike') {
+  return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts/${postId}/comments/${commentId}/${reaction}`, { method: 'POST', headers: authHeaders(token) }));
+}
+
+export async function getNotifications(apiBase: string, token: string) {
+  return parse<{ notifications: Notification[]; unreadCount: number }>(await fetch(`${apiBase}/api/notifications`, { headers: authHeaders(token) }));
+}
+
+export async function markNotificationsRead(apiBase: string, token: string) {
+  return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/notifications/read`, { method: 'POST', headers: authHeaders(token) }));
 }
 
 export async function getProfile(apiBase: string, token: string, userId: string) {
