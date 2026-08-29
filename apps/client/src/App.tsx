@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currentUser, defaultApiBase, getBoardNotifications, getNotifications, login, logout, register } from './api';
+import { currentUser, getBoardNotifications, getNotifications, login, logout, register, resolveApiBase } from './api';
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
@@ -23,8 +23,7 @@ export default function App() {
   const [boardUnreadCount, setBoardUnreadCount] = useState(0);
   const [suspensionAcknowledged, setSuspensionAcknowledged] = useState(false);
   const [feedPostId, setFeedPostId] = useState<string>();
-
-  const apiBase = defaultApiBase.replace(/\/$/, '');
+  const [apiBase, setApiBase] = useState('');
 
   const acceptSession = (nextUser: User, nextToken: string) => {
     setUser(nextUser);
@@ -37,12 +36,16 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', localStorage.getItem('lynesque-ui-scale') || '1');
     localStorage.removeItem('lynesque-api');
-    if (!token) return;
+    resolveApiBase().then(setApiBase);
+  }, []);
+
+  useEffect(() => {
+    if (!apiBase || !token) return;
     currentUser(apiBase, token).then(({ user: restored }) => acceptSession(restored, token)).catch(() => {
       setToken('');
       localStorage.removeItem('lynesque-token');
     });
-  }, []);
+  }, [apiBase]);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -70,8 +73,9 @@ export default function App() {
     setTab('feed');
   };
 
+  if (!apiBase) return <div className="auth-page"><div className="auth-panel panel">Connecting to Lynesque…</div></div>;
   if (!user || !token) {
-    return <AuthScreen status={status} setStatus={setStatus} onSession={acceptSession} />;
+    return <AuthScreen apiBase={apiBase} status={status} setStatus={setStatus} onSession={acceptSession} />;
   }
 
   return (
@@ -118,8 +122,8 @@ export default function App() {
   );
 }
 
-function AuthScreen({ status, setStatus, onSession }: {
-  status: string; setStatus: (value: string) => void;
+function AuthScreen({ apiBase, status, setStatus, onSession }: {
+  apiBase:string; status: string; setStatus: (value: string) => void;
   onSession: (user: User, token: string) => void;
 }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -129,7 +133,7 @@ function AuthScreen({ status, setStatus, onSession }: {
     event.preventDefault();
     setStatus(mode === 'login' ? 'Signing in...' : 'Creating account...');
     try {
-      const result = mode === 'login' ? await login(defaultApiBase, username, password) : await register(defaultApiBase, username, password);
+      const result = mode === 'login' ? await login(apiBase, username, password) : await register(apiBase, username, password);
       setStatus('');
       onSession(result.user, result.token);
     } catch (error) {

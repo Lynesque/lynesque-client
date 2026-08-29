@@ -1,9 +1,21 @@
 import type { AdminLog, AssetRecord, BoardPost, Notification, NotificationPreferences, Post, Profile, Report, Scene, Suspension, User } from './types';
 
 const queryApi = new URLSearchParams(window.location.search).get('api');
+export const publicApiBases = ['https://lyneque.com', 'https://lynesque.com'] as const;
 export const defaultApiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:'
   ? window.location.origin
-  : queryApi || 'https://lynesque.com').replace(/\/$/, '');
+  : queryApi || publicApiBases[0]).replace(/\/$/, '');
+
+export async function resolveApiBase() {
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:' || queryApi) return defaultApiBase;
+  for (const candidate of publicApiBases) {
+    try {
+      const response = await fetch(`${candidate}/api/health`, { signal: AbortSignal.timeout(2500) });
+      if (response.ok) return candidate;
+    } catch (_) {}
+  }
+  return publicApiBases[0];
+}
 
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
