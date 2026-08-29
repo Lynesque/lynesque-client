@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { getNotifications, markNotificationsRead, mediaUrl } from '../api';
+import { clearNotifications, getNotifications, markNotificationsRead } from '../api';
 import type { Notification } from '../types';
+import { UserAvatar, UserName } from './UserIdentity';
 
 const messages: Record<Notification['kind'], string> = {
   post_like: 'liked your video',
@@ -27,7 +28,8 @@ const messages: Record<Notification['kind'], string> = {
   content_removed: 'had some of your content taken down',
   admin_changed: 'changed your admin status',
   report_resolved: 'resolved your report',
-  admin_rate_limited: 'was automatically blocked from admin actions'
+  admin_rate_limited: 'was automatically blocked from admin actions',
+  automatic_suspension: 'was automatically suspended by asset safety'
 };
 
 export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onProfile, onHide }: {
@@ -55,16 +57,19 @@ export function Notifications({ apiBase, token, onUnreadCount, onOpenPost, onPro
     return () => { active = false; window.clearInterval(timer); };
   }, [apiBase, token]);
 
+  const clear = async () => {
+    if (!items.length || !window.confirm('Clear all feed notifications? This cannot be undone.')) return;
+    await clearNotifications(apiBase, token); highlighted.current.clear(); setItems([]); onUnreadCount(0);
+  };
+
   return <aside className="notifications panel">
-    <div className="notifications-head"><h2>Notifications</h2><button onClick={onHide}>Hide</button></div>
+    <div className="notifications-head"><h2>Notifications</h2><div><button onClick={clear} disabled={!items.length}>Clear</button><button onClick={onHide}>Hide</button></div></div>
     {items.length === 0 && <p className="empty-notifications">Nothing here yet.</p>}
     <div className="notification-list">
       {items.map((item) => <div className={`notification ${highlighted.current.has(item.id) ? 'notification-new' : ''}`} key={item.id}>
-        <button className="notification-avatar" onClick={() => onProfile(item.actor?.id || item.actorId)}>
-          {item.actor?.avatarAssetId ? <img src={mediaUrl(apiBase, item.actor.avatarAssetId)} alt="" /> : (item.actor?.displayName || item.actorId).slice(0, 1).toUpperCase()}
-        </button>
+        <button className="notification-avatar" onClick={() => onProfile(item.actor?.id || item.actorId)}><UserAvatar apiBase={apiBase} user={item.actor} small /></button>
         <button className="notification-body" onClick={() => item.postId ? onOpenPost(item.postId) : onProfile(item.actor?.id || item.actorId)}>
-          <span>{item.message || <><strong>@{item.actor?.displayName || item.actorId}</strong> {messages[item.kind]}</>}</span>
+          <span>{item.message || <><strong><UserName user={item.actor} fallbackId={item.actorId}/></strong> {messages[item.kind]}</>}</span>
           <time>{new Date(item.createdAt).toLocaleString()}</time>
         </button>
       </div>)}

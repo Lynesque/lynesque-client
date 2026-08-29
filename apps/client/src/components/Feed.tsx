@@ -1,40 +1,39 @@
 import { useEffect, useState } from 'react';
-import { addComment, getFeed, getPost, mediaUrl, runShitTok, searchVideos, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
+import { addComment, adminDeleteComment, adminDeletePost, getFeed, getPost, mediaUrl, runShitTok, searchVideos, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { AssetRecord, Post, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
 import { Notifications } from './Notifications';
 import { AssetLibrary } from './AssetLibrary';
+import { AdminMenu } from './AdminMenu';
+import { UserAvatar, UserName } from './UserIdentity';
 
-function Avatar({ apiBase, user, small = false }: { apiBase: string; user?: User; small?: boolean }) {
-  return <span className={`mini-avatar ${small ? 'small' : ''}`}>
-    {user?.avatarAssetId ? <img src={mediaUrl(apiBase, user.avatarAssetId)} alt="" /> : <span>{user?.displayName.slice(0, 1).toUpperCase() || '?'}</span>}
-  </span>;
-}
-
-function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile, onHash }: {
-  apiBase: string; token: string; viewerId: string; post: Post; onPost: (post: Post) => void; onProfile: (id: string) => void; onHash: (tag: string) => void;
+function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVisible, onPost, onDeleted, onProfile, onHash }: {
+  apiBase: string; token: string; viewer: User; post: Post; commentsVisible: boolean; setCommentsVisible: React.Dispatch<React.SetStateAction<boolean>>; onPost: (post: Post) => void; onDeleted: () => void; onProfile: (id: string) => void; onHash: (tag: string) => void;
 }) {
   const timeline = useTimeline(7);
   const [comment, setComment] = useState('');
-  const [commentsVisible, setCommentsVisible] = useState(false);
   const [stickersVisible, setStickersVisible] = useState(false);
   const [sticker, setSticker] = useState<AssetRecord | null>(null);
+  const [copied, setCopied] = useState(false);
   const refreshPost = async () => onPost((await getPost(apiBase, token, post.id)).post);
+  const reference = `LYN-${post.id.slice(0, 8).toUpperCase()}`;
+  const publicOrigin = /^(lyneque|lynesque)\.com$/i.test(window.location.hostname) ? window.location.origin : 'https://lyneque.com';
+  const shareUrl = `${publicOrigin}/?video=${encodeURIComponent(post.id)}`;
   return (
     <div className={`post-with-comments ${commentsVisible ? 'comments-open' : ''}`}>
     <article className="feed-post panel">
       <div className="post-head">
         <div className="creator-line">
-          <button className="creator-link" onClick={() => onProfile(post.author.id)}><Avatar apiBase={apiBase} user={post.author} /><span>@{post.author.displayName}<small>{post.author.followerCount} followers</small></span></button>
-          {post.author.id !== viewerId && <button className={post.author.followedByViewer ? 'following' : 'follow'} onClick={async () => {
+          <button className="creator-link" onClick={() => onProfile(post.author.id)}><UserAvatar apiBase={apiBase} user={post.author} /><span><UserName user={post.author}/><small>{post.author.followerCount} followers</small></span></button>
+          {post.author.id !== viewer.id && <button className={post.author.followedByViewer ? 'following' : 'follow'} onClick={async () => {
             const { user } = await toggleFollow(apiBase, token, post.author.id);
             onPost({ ...post, author: user });
           }}>{post.author.followedByViewer ? 'Following' : 'Follow'}</button>}
         </div>
-        <span>{new Date(post.createdAt).toLocaleString()}</span>
+        <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span>{viewer.isAdmin&&<AdminMenu label="Moderate video" onDelete={async()=>{if(!window.confirm(`Delete “${post.title}”?`))return;const reason=window.prompt('Reason shown to the creator and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeletePost(apiBase,token,post.id,reason);onDeleted();}}/>}</div>
       </div>
-      <h2 className="video-post-title">{post.title.split(/(#[a-zA-Z0-9_-]+)/g).map((part,index)=>part.startsWith('#')?<button className="text-link" key={index} onClick={()=>onHash(part)}>{part}</button>:part)}</h2>
+      <div className="video-title-row"><h2 className="video-post-title">{post.title.split(/(#[a-zA-Z0-9_-]+)/g).map((part,index)=>part.startsWith('#')?<button className="text-link" key={index} onClick={()=>onHash(part)}>{part}</button>:part)}</h2><code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
       <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>
         <SceneCanvas scene={post.scene} time={timeline.time} playing={timeline.playing} apiBase={apiBase} />
         {!timeline.playing && <div className="play-overlay">▶</div>}
@@ -50,15 +49,16 @@ function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile, onHash }:
         {post.comments.length === 0 && <p className="empty-comments">No comments yet.</p>}
         {post.comments.map((entry) => (
           <div className="comment" key={entry.id}>
-            <Avatar apiBase={apiBase} user={entry.user} small />
+            <UserAvatar apiBase={apiBase} user={entry.user} small />
             <div className="comment-content">
-              <span><button className="inline-user" onClick={() => onProfile(entry.user?.id || entry.userId)}>@{entry.user?.displayName || entry.userId}</button> {entry.text}</span>
+              <span><button className="inline-user" onClick={() => onProfile(entry.user?.id || entry.userId)}><UserName user={entry.user} fallbackId={entry.userId}/></button> {entry.text}</span>
               {entry.stickerAssetId && <img className="comment-sticker" src={mediaUrl(apiBase, entry.stickerAssetId)} alt="Sticker" loading="lazy" />}
               <div className="comment-meta">
                 <time>{new Date(entry.createdAt).toLocaleString()}</time>
                 <button className={entry.likedByViewer ? 'liked' : ''} onClick={async () => onPost((await toggleCommentReaction(apiBase, token, post.id, entry.id, 'like')).post)}>▲</button>
                 <strong>{entry.likeCount}</strong>
                 <button className={entry.dislikedByViewer ? 'disliked' : ''} onClick={async () => onPost((await toggleCommentReaction(apiBase, token, post.id, entry.id, 'dislike')).post)}>▼</button>
+                {viewer.isAdmin&&<AdminMenu label="Moderate comment" onDelete={async()=>{if(!window.confirm('Delete this comment?'))return;const reason=window.prompt('Reason shown to the commenter and saved in the admin log:','Removed directly by an admin.');if(reason===null)return;await adminDeleteComment(apiBase,token,post.id,entry.id,reason);await refreshPost();}}/>}
               </div>
             </div>
           </div>
@@ -76,7 +76,7 @@ function FeedPost({ apiBase, token, viewerId, post, onPost, onProfile, onHash }:
         {sticker && <div className="selected-sticker"><img src={mediaUrl(apiBase, sticker.id)} alt="Selected sticker" /><button type="button" onClick={() => setSticker(null)}>Remove</button></div>}
         <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
       </form>
-      {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
+      {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={viewer.isAdmin} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
     </aside>}
     </div>
   );
@@ -91,7 +91,9 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
   const [status, setStatus] = useState('');
   const [videoNumber, setVideoNumber] = useState('1');
   const [notificationsVisible, setNotificationsVisible] = useState(true);
+  const [commentsVisible, setCommentsVisible] = useState(false);
   const [search, setSearch] = useState(() => localStorage.getItem('lynesque-search') || '');
+  const arrowSide = localStorage.getItem('lynesque-arrow-side') === 'right' ? 'right' : 'left';
 
   const load = async (nextOffset: number) => {
     try {
@@ -142,7 +144,7 @@ export function Feed({ apiBase, token, user, refreshToken, initialPostId, onUnre
         {user.id === 'lynesque' && <button onClick={async () => { const result = await runShitTok(apiBase, token); setStatus(`shit-tok: ${JSON.stringify(result)}`); await load(0); }}>Run shit-tok</button>}
       </div>
       {status && <div className="status">{status}</div>}
-      {post && <div className="feed-viewer"><div className="video-arrows"><button aria-label="Previous video" title="Previous video" disabled={offset<=0} onClick={()=>load(offset-1)}>▲</button><button aria-label="Next video" title="Next video" disabled={offset+1>=total} onClick={()=>load(offset+1)}>▼</button></div><FeedPost key={post.id} apiBase={apiBase} token={token} viewerId={user.id} post={post} onPost={setPost} onProfile={onProfile} onHash={hashtag} /></div>}
+      {post && <div className={`feed-viewer arrows-${arrowSide}`}><div className="video-arrows"><button aria-label="Previous video" title="Previous video" disabled={offset<=0} onClick={()=>load(offset-1)}>▲</button><button aria-label="Next video" title="Next video" disabled={offset+1>=total} onClick={()=>load(offset+1)}>▼</button></div><FeedPost key={post.id} apiBase={apiBase} token={token} viewer={user} post={post} commentsVisible={commentsVisible} setCommentsVisible={setCommentsVisible} onPost={setPost} onDeleted={()=>load(Math.max(0,Math.min(offset,total-2)))} onProfile={onProfile} onHash={hashtag} /></div>}
       </div>
     </div>
   );

@@ -48,9 +48,9 @@ export async function logout(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', headers: authHeaders(token) }));
 }
 
-export async function uploadAsset(apiBase: string, token: string, file: File) {
+export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name) {
   return parse<{ asset: AssetRecord; deduplicated: boolean }>(await fetch(`${apiBase}/api/assets`, {
-    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }, body: file
+    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(displayName) }, body: file
   }));
 }
 
@@ -80,6 +80,7 @@ export async function addBoardComment(apiBase:string,token:string,id:string,text
 export async function toggleBoardCommentReaction(apiBase:string,token:string,id:string,commentId:string,reaction:'like'|'dislike'){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/postboard/${id}/comments/${commentId}/${reaction}`,{method:'POST',headers:authHeaders(token)}));}
 export async function getBoardNotifications(apiBase:string,token:string){return parse<{notifications:Notification[];unreadCount:number}>(await fetch(`${apiBase}/api/postboard/notifications`,{headers:authHeaders(token)}));}
 export async function markBoardNotificationsRead(apiBase:string,token:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/postboard/notifications/read`,{method:'POST',headers:authHeaders(token)}));}
+export async function clearBoardNotifications(apiBase:string,token:string){return parse<{ok:boolean;cleared:number}>(await fetch(`${apiBase}/api/postboard/notifications`,{method:'DELETE',headers:authHeaders(token)}));}
 
 export async function toggleLike(apiBase: string, token: string, postId: string) {
   return parse<{ post: Post }>(await fetch(`${apiBase}/api/posts/${postId}/like`, { method: 'POST', headers: authHeaders(token) }));
@@ -110,19 +111,28 @@ export async function getNotifications(apiBase: string, token: string) {
 export async function markNotificationsRead(apiBase: string, token: string) {
   return parse<{ ok: boolean }>(await fetch(`${apiBase}/api/notifications/read`, { method: 'POST', headers: authHeaders(token) }));
 }
+export async function clearNotifications(apiBase:string,token:string){return parse<{ok:boolean;cleared:number}>(await fetch(`${apiBase}/api/notifications`,{method:'DELETE',headers:authHeaders(token)}));}
 export async function getNotificationSettings(apiBase:string,token:string){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{headers:authHeaders(token)}));}
 export async function setNotificationSettings(apiBase:string,token:string,preferences:NotificationPreferences){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({preferences})}));}
 export async function createReport(apiBase:string,token:string,input:{targetType:'user'|'asset';username?:string;assetId?:string;reason:string}){return parse<{report:Report}>(await fetch(`${apiBase}/api/reports`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(input)}));}
 export async function getAdminOverview(apiBase:string,token:string){return parse<{reports:Report[];suspensions:Suspension[];logs:AdminLog[]}>(await fetch(`${apiBase}/api/admin/overview`,{headers:authHeaders(token)}));}
 export async function setAdminRole(apiBase:string,token:string,userId:string,enabled:boolean){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/admin`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled})}));}
+export async function setVerified(apiBase:string,token:string,userId:string,enabled:boolean){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/verified`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled})}));}
 export async function restoreAdminActions(apiBase:string,token:string,userId:string){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/restore`,{method:'POST',headers:authHeaders(token)}));}
 export async function suspendUser(apiBase:string,token:string,username:string,reason:string,hours:number){return parse<{suspension:Suspension}>(await fetch(`${apiBase}/api/admin/suspensions`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({username,reason,hours})}));}
 export async function unsuspendUser(apiBase:string,token:string,userId:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/admin/suspensions/${encodeURIComponent(userId)}/clear`,{method:'POST',headers:authHeaders(token)}));}
 export async function resolveReport(apiBase:string,token:string,reportId:string,status:'accepted'|'denied',reason:string,suspensionHours:number){return parse<{report:Report}>(await fetch(`${apiBase}/api/admin/reports/${encodeURIComponent(reportId)}/resolve`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({status,reason,suspensionHours})}));}
+async function adminDelete(apiBase:string,token:string,path:string,reason:string){return parse<{ok:boolean}>(await fetch(`${apiBase}${path}`,{method:'DELETE',headers:authHeaders(token,true),body:JSON.stringify({reason})}));}
+export const adminDeleteAsset=(apiBase:string,token:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/assets/${encodeURIComponent(id)}`,reason);
+export const adminDeletePost=(apiBase:string,token:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/posts/${encodeURIComponent(id)}`,reason);
+export const adminDeleteComment=(apiBase:string,token:string,postId:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(id)}`,reason);
+export const adminDeleteBoardPost=(apiBase:string,token:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(id)}`,reason);
+export const adminDeleteBoardComment=(apiBase:string,token:string,postId:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(postId)}/comments/${encodeURIComponent(id)}`,reason);
 
 export async function getProfile(apiBase: string, token: string, userId: string) {
   return parse<Profile>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/profile`, { headers: authHeaders(token) }));
 }
+export async function searchUsers(apiBase:string,token:string,query:string){return parse<{users:User[]}>(await fetch(`${apiBase}/api/search/users?q=${encodeURIComponent(query)}`,{headers:authHeaders(token)}));}
 
 export async function updateAvatar(apiBase: string, token: string, assetId: string) {
   return parse<{ user: User }>(await fetch(`${apiBase}/api/profile/avatar`, {
@@ -135,3 +145,4 @@ export async function runShitTok(apiBase: string, token: string) {
 }
 
 export const mediaUrl = (apiBase: string, assetId: string) => `${apiBase}/media/${encodeURIComponent(assetId)}`;
+export const avatarUrl = (apiBase: string, assetId: string) => `${apiBase}/avatar/${encodeURIComponent(assetId)}`;

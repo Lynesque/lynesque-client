@@ -9,6 +9,7 @@ import { SceneCanvas } from './SceneCanvas';
 interface Props {
   apiBase: string;
   token: string;
+  isAdmin: boolean;
   onPosted: () => void;
 }
 
@@ -21,8 +22,9 @@ const baseFrame = (time: number): TransformKeyframe => ({
   rotation: 0,
   opacity: 1
 });
+const MAX_ASSET_LAYERS = 20;
 
-export function Composer({ apiBase, token, onPosted }: Props) {
+export function Composer({ apiBase, token, isAdmin, onPosted }: Props) {
   const [scene, setScene] = useState<Scene>({ version: 1, duration: 7, background: '#000000', layers: [] });
   const [assets, setAssets] = useState<Record<string, AssetRecord>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,6 +50,10 @@ export function Composer({ apiBase, token, onPosted }: Props) {
   };
 
   const addAssetLayer = (asset: AssetRecord) => {
+    if (scene.layers.filter((layer) => layer.kind === 'asset').length >= MAX_ASSET_LAYERS) {
+      setStatus(`A video can contain at most ${MAX_ASSET_LAYERS} asset layers.`);
+      return false;
+    }
     setAssets((current) => ({ ...current, [asset.id]: asset }));
     const id = crypto.randomUUID();
     const layer: SceneLayer = {
@@ -67,22 +73,38 @@ export function Composer({ apiBase, token, onPosted }: Props) {
     }
     setScene((current) => ({ ...current, layers: [...current.layers, layer] }));
     setSelectedId(id);
+    return true;
   };
 
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
+    let assetCount = scene.layers.filter((layer) => layer.kind === 'asset').length;
     for (const file of [...files]) {
-      setStatus(`Uploading ${file.name}...`);
+      if (assetCount >= MAX_ASSET_LAYERS) { setStatus(`Only the first ${MAX_ASSET_LAYERS} asset layers were added.`); break; }
+      const displayName = window.prompt('Name this asset so people can find it in the library:', file.name.replace(/\.[^.]+$/, '') || file.name);
+      if (displayName === null) continue;
+      if (!displayName.trim()) { setStatus(`${file.name} was skipped because its name was empty.`); continue; }
+      setStatus(`Uploading ${displayName.trim()}...`);
       try {
-        const { asset, deduplicated } = await uploadAsset(apiBase, token, file);
-        addAssetLayer(asset);
-        setStatus(deduplicated ? `${file.name} already existed; reused the stored copy.` : `${file.name} uploaded.`);
+        const { asset, deduplicated } = await uploadAsset(apiBase, token, file, displayName.trim());
+        if (!addAssetLayer(asset)) break;
+        assetCount += 1;
+        setStatus(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : `${displayName.trim()} uploaded.`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Upload failed.');
       }
     }
     if (fileInput.current) fileInput.current.value = '';
   };
+
+  const moveLayer = (id: string, direction: -1 | 1) => setScene((current) => {
+    const layers = [...current.layers];
+    const index = layers.findIndex((layer) => layer.id === id);
+    const destination = index + direction;
+    if (index < 0 || destination < 0 || destination >= layers.length) return current;
+    [layers[index], layers[destination]] = [layers[destination], layers[index]];
+    return { ...current, layers };
+  });
 
   const addText = () => {
     const id = crypto.randomUUID();
@@ -137,6 +159,7 @@ export function Composer({ apiBase, token, onPosted }: Props) {
           <button onClick={() => fileInput.current?.click()}>Add media</button>
           <button className={libraryVisible ? 'active' : ''} onClick={() => setLibraryVisible((visible) => !visible)}>Library</button>
           <button onClick={addText}>Add text</button>
+          <span className="asset-count">Assets {scene.layers.filter((layer)=>layer.kind==='asset').length}/{MAX_ASSET_LAYERS}</span>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
           <input className="video-title" value={title} maxLength={180} onChange={(event) => setTitle(event.target.value)} placeholder="Video title — #hashtags and @people work" />
           <button className="primary" onClick={publish}>Publish video</button>
@@ -175,14 +198,17 @@ export function Composer({ apiBase, token, onPosted }: Props) {
       </section>
 
       <aside className="panel composer-right">
-        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { addAssetLayer(asset); setStatus(`${asset.originalName} added from the library.`); }} />}
+        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={isAdmin} sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
         <h3>Layers</h3>
         <div className="layer-list">
-          {[...hydratedScene.layers].reverse().map((layer) => (
-            <button key={layer.id} className={layer.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(layer.id)}>
-              {layer.kind === 'text' ? `Text: ${layer.text.slice(0, 24)}` : assets[layer.assetId]?.originalName || layer.assetKind || 'media'}
-            </button>
-          ))}
+          {[...hydratedScene.layers].reverse().map((layer) => {
+            const index = hydratedScene.layers.findIndex((item) => item.id === layer.id);
+            return <div className="layer-row" key={layer.id}>
+              <button className={layer.id === selectedId ? 'active layer-name' : 'layer-name'} onClick={() => setSelectedId(layer.id)}>{layer.kind === 'text' ? `Text: ${layer.text.slice(0, 24)}` : assets[layer.assetId]?.originalName || layer.assetKind || 'media'}</button>
+              <button disabled={index === hydratedScene.layers.length - 1} title="Bring layer forward" aria-label="Bring layer forward" onClick={() => moveLayer(layer.id, 1)}>↑</button>
+              <button disabled={index === 0} title="Send layer backward" aria-label="Send layer backward" onClick={() => moveLayer(layer.id, -1)}>↓</button>
+            </div>;
+          })}
         </div>
         <LayerInspector
           layer={selected}
