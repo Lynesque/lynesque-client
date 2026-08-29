@@ -1,6 +1,8 @@
 import type { AssetRecord, Notification, Post, Profile, Scene, User } from './types';
 
-export const defaultApiBase = 'http://127.0.0.1:8787';
+export const defaultApiBase = window.location.protocol === 'http:' || window.location.protocol === 'https:'
+  ? window.location.origin
+  : 'http://127.0.0.1:8787';
 
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));

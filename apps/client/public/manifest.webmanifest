@@ -1,0 +1,23 @@
+{
+  "name": "lynesque.com",
+  "short_name": "lynesque",
+  "description": "totally better than",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0c0c0e",
+  "theme_color": "#0c0c0e",
+  "icons": [
+    {
+      "src": "./lynesque-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./lynesque-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
