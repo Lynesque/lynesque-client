@@ -65,9 +65,9 @@ export async function beginPatreonLink(apiBase:string,token:string){return parse
 export async function refreshPatreonLink(apiBase:string,token:string){return parse<{user:User;entitled:boolean}>(await fetch(`${apiBase}/api/integrations/patreon/refresh`,{method:'POST',headers:authHeaders(token)}));}
 export async function unlinkPatreon(apiBase:string,token:string){return parse<{user:User}>(await fetch(`${apiBase}/api/integrations/patreon`,{method:'DELETE',headers:authHeaders(token)}));}
 
-export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name,visibility:'public'|'private'='public') {
+export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name,visibility:'public'|'private'='public',mature=false) {
   return parse<{ asset: AssetRecord; deduplicated: boolean;pending?:boolean;message?:string }>(await fetch(`${apiBase}/api/assets`, {
-    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(displayName),'X-Asset-Visibility':visibility }, body: file
+    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(displayName),'X-Asset-Visibility':visibility,'X-Asset-Mature':String(mature) }, body: file
   }));
 }
 
@@ -136,10 +136,10 @@ export async function markNotificationsRead(apiBase: string, token: string) {
 export async function clearNotifications(apiBase:string,token:string){return parse<{ok:boolean;cleared:number}>(await fetch(`${apiBase}/api/notifications`,{method:'DELETE',headers:authHeaders(token)}));}
 export async function getNotificationSettings(apiBase:string,token:string){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{headers:authHeaders(token)}));}
 export async function setNotificationSettings(apiBase:string,token:string,preferences:NotificationPreferences){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({preferences})}));}
-export async function requestEmailVerification(apiBase:string,token:string,email:string){return parse<{ok?:boolean;message?:string;alreadyVerified?:boolean;user?:User}>(await fetch(`${apiBase}/api/settings/email`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({email})}));}
-export async function setMfa(apiBase:string,token:string,enabled:boolean,password:string){return parse<{user:User;message:string}>(await fetch(`${apiBase}/api/settings/mfa`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled,password})}));}
+export async function requestEmailVerification(apiBase:string,token:string,email:string,password=''){return parse<{ok?:boolean;message?:string;alreadyVerified?:boolean;user?:User}>(await fetch(`${apiBase}/api/settings/email`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({email,password})}));}
+export async function setMfa(apiBase:string,token:string,enabled:boolean,password:string,challengeId?:string,code?:string){return parse<{user?:User;message:string;requiresCode?:boolean;challengeId?:string}>(await fetch(`${apiBase}/api/settings/mfa`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled,password,challengeId,code})}));}
 export async function setMatureContent(apiBase:string,token:string,enabled:boolean,confirmAdult=false){return parse<{user:User}>(await fetch(`${apiBase}/api/settings/mature-content`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled,confirmAdult})}));}
-export async function getPublicConfig(apiBase:string){return parse<{policyVersion:string;minimumAge:number;matureMinimumAge:number;abuseContactEmail:string;takedownContactEmail:string}>(await fetch(`${apiBase}/api/public-config`));}
+export async function getPublicConfig(apiBase:string){return parse<{release:string;policyVersion:string;minimumAge:number;matureMinimumAge:number;abuseContactEmail:string;takedownContactEmail:string}>(await fetch(`${apiBase}/api/public-config`));}
 export async function getEmojis(apiBase:string){return parse<{emojis:string[]}>(await fetch(`${apiBase}/api/emojis`));}
 export async function setEmojiBadge(apiBase:string,token:string,name?:string){return parse<{user:User}>(await fetch(`${apiBase}/api/settings/emoji-badge`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({name:name||''})}));}
 export async function createReport(apiBase:string,token:string,input:{targetType:import('./types').ReportTargetType;username?:string;assetId?:string;postId?:string;boardPostId?:string;commentId?:string;reason:string}){return parse<{report:Report}>(await fetch(`${apiBase}/api/reports`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(input)}));}
@@ -180,3 +180,6 @@ export const setMediaAccessToken=(token='')=>{mediaAccessToken=token;};
 export const mediaUrl = (apiBase: string, assetId: string) => `${apiBase}/media/${encodeURIComponent(assetId)}${mediaAccessToken?`?access=${encodeURIComponent(mediaAccessToken)}`:''}`;
 export const avatarUrl = (apiBase: string, assetId: string) => `${apiBase}/avatar/${encodeURIComponent(assetId)}`;
 export const emojiUrl = (apiBase:string,name:string)=>`${apiBase}/emoji/${encodeURIComponent(name)}`;
+
+export async function updateAssetControls(apiBase:string,token:string,id:string,changes:{mature?:boolean;visibility?:'public'|'private'}){return parse<{asset:AssetRecord}>(await fetch(apiBase+'/api/assets/'+encodeURIComponent(id)+'/controls',{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(changes)}));}
+export async function getAdminItems<T>(apiBase:string,token:string,section:string,offset:number,limit=30){return parse<{items:T[];total:number;hasMore:boolean}>(await fetch(apiBase+'/api/admin/items?section='+encodeURIComponent(section)+'&offset='+offset+'&limit='+limit,{headers:authHeaders(token)}));}

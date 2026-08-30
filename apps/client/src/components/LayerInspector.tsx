@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { patchTransform, type SyncState } from '../editorTransforms';
 import type { SceneLayer, TransformKeyframe } from '../types';
 import { EmojiButton } from './CustomEmoji';
 
@@ -9,25 +9,21 @@ interface Props {
   onChange: (layer: SceneLayer) => void;
   onDelete: () => void;
   apiBase: string;
+  synced:SyncState;
+  onToggleSync:(key:keyof TransformKeyframe)=>void;
 }
 
 const num = (value: string) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete,apiBase }: Props) {
-  const [synced,setSynced]=useState<Record<string,boolean>>({});
+export function LayerInspector({ layer, endpoint, onEndpoint, onChange, onDelete,apiBase,synced,onToggleSync }: Props) {
   if (!layer) return <div className="inspector empty">Select a layer.</div>;
   const frame = layer.keyframes[endpoint];
 
   const patchFrame = (patch: Partial<typeof frame>) => {
-    const frames = [...layer.keyframes] as [typeof frame, typeof frame];
-    frames[endpoint] = { ...frame, ...patch };
-    for(const [key,value] of Object.entries(patch) as [keyof TransformKeyframe,number][]){
-      if(synced[`${layer.id}:${key}`])frames[endpoint===0?1:0]={...frames[endpoint===0?1:0],[key]:value};
-    }
-    onChange({ ...layer, keyframes: frames } as SceneLayer);
+    onChange(patchTransform(layer,endpoint,patch,synced));
   };
-  const toggleSync=(key:keyof typeof frame)=>{const syncKey=`${layer.id}:${key}`,willSync=!synced[syncKey];setSynced((current)=>({...current,[syncKey]:willSync}));if(willSync){const frames=[...layer.keyframes] as [typeof frame,typeof frame];frames[endpoint===0?1:0]={...frames[endpoint===0?1:0],[key]:frames[endpoint][key]};onChange({...layer,keyframes:frames} as SceneLayer);}};
-  const field=(label:string,key:'x'|'y'|'width'|'height'|'rotation'|'opacity',options:{min?:number;max?:number;step:number})=>{const active=Boolean(synced[`${layer.id}:${key}`]);return <label className={`sync-field ${active?'is-synced':''}`}><span>{label}<button type="button" className={active?'active':''} aria-pressed={active} title={`${active?'Stop':'Start'} keeping ${label} identical at both transforms`} onClick={()=>toggleSync(key)}>{active?'Synced':'Sync'}</button></span><input type="number" min={options.min} max={options.max} step={options.step} value={key==='rotation'?Math.round(frame[key]||0):(frame[key]??1).toFixed(2)} onChange={(e)=>patchFrame({[key]:num(e.target.value)})}/></label>;};
+  const toggleSync=onToggleSync;
+  const field=(label:string,key:'x'|'y'|'width'|'height'|'rotation'|'opacity',options:{min?:number;max?:number;step:number})=>{const active=Boolean(synced[`${layer.id}:${key}`]);return <label className={`sync-field ${active?'is-synced':''}`}><span>{label}<button type="button" className={active?'active':''} aria-pressed={active} title={`${active?'Stop':'Start'} keeping ${label} identical at both transforms`} onClick={()=>toggleSync(key)}>{active?'Synced':'Sync'}</button></span><input aria-label={label} type="number" min={options.min} max={options.max} step={options.step} value={key==='rotation'?Math.round(frame[key]||0):(frame[key]??1).toFixed(2)} onChange={(e)=>patchFrame({[key]:num(e.target.value)})}/></label>;};
 
   const patchTiming = (start: number, end: number) => {
     const cleanStart = Math.max(0, Math.min(7, start));

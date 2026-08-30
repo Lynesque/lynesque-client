@@ -13,6 +13,8 @@ export interface AssetRecord {
   moderationStatus?: 'public' | 'pending';
   visibility?: 'public' | 'private';
   safetyMature?: boolean;
+  mature?: boolean;
+  previewAllowed?: boolean;
   uploader?: User;
 }
 
@@ -117,7 +119,7 @@ export interface Comment {
   user?: User;
 }
 
-export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_removed'|'content_removed'|'content_mature'|'board_content_mature'|'admin_changed'|'report_resolved'|'review_resolved'|'admin_rate_limited'|'automatic_suspension';
+export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_changed'|'asset_removed'|'content_removed'|'content_mature'|'board_content_mature'|'admin_changed'|'report_resolved'|'review_resolved'|'admin_rate_limited'|'automatic_suspension';
 export type NotificationPreferences = Record<NotificationKind, boolean>;
 
 export interface Notification {

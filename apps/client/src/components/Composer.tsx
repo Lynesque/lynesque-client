@@ -1,3 +1,4 @@
+import { patchTransform, type SyncState } from '../editorTransforms';
 import { useMemo, useRef, useState } from 'react';
 import { ApiError, createPost, uploadAsset } from '../api';
 import { useTimeline } from '../useTimeline';
@@ -36,6 +37,8 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
   const [libraryVisible, setLibraryVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [privateUploads,setPrivateUploads]=useState(false);
+  const [matureUploads,setMatureUploads]=useState(false);
+  const [synced,setSynced]=useState<SyncState>({});
   const [mature,setMature]=useState(false);
   const [settingsSuggested,setSettingsSuggested]=useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -92,7 +95,7 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
       if (!displayName.trim()) { setStatus(`${file.name} was skipped because its name was empty.`); continue; }
       setStatus(`Uploading ${displayName.trim()}...`);
       try {
-        const { asset, deduplicated,pending,message } = await uploadAsset(apiBase, token, file, displayName.trim(),privateUploads?'private':'public');
+        const { asset, deduplicated,pending,message } = await uploadAsset(apiBase, token, file, displayName.trim(),privateUploads?'private':'public',matureUploads);
         if (!addAssetLayer(asset)) break;
         assetCount += 1;
         setStatus(message||(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : pending?`${displayName.trim()} is awaiting the site moderation system.`:`${displayName.trim()} uploaded.`));
@@ -136,9 +139,7 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
   const moveEndpoint = (id: string, which: 0 | 1, x: number, y: number) => {
     const target = scene.layers.find((layer) => layer.id === id);
     if (!target) return;
-    const frames = [...target.keyframes] as [TransformKeyframe, TransformKeyframe];
-    frames[which] = { ...frames[which], x, y };
-    replaceLayer({ ...target, keyframes: frames } as SceneLayer);
+    replaceLayer(patchTransform(target,which,{x,y},synced));
   };
 
   const publish = async () => {
@@ -169,6 +170,7 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
           <button className={libraryVisible ? 'active' : ''} onClick={() => setLibraryVisible((visible) => !visible)}>Library</button>
           <button onClick={addText}>Add text</button>
           <label className="check compact-check"><input type="checkbox" checked={privateUploads} onChange={(event)=>setPrivateUploads(event.target.checked)}/> New uploads private</label>
+          <label className="check compact-check"><input type="checkbox" checked={matureUploads} onChange={event=>setMatureUploads(event.target.checked)}/> New uploads Mature</label>
           <label className="check compact-check"><input type="checkbox" checked={mature} onChange={(event)=>setMature(event.target.checked)}/> Mature video</label>
           <span className="asset-count">Assets {scene.layers.filter((layer)=>layer.kind==='asset').length}/{MAX_ASSET_LAYERS}</span>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
@@ -222,6 +224,8 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
           })}
         </div>
         <LayerInspector
+          synced={synced}
+          onToggleSync={(key)=>{if(!selected)return;const id=`${selected.id}:${key}`,enabled=!synced[id];const next={...synced,[id]:enabled};setSynced(next);if(enabled)replaceLayer(patchTransform(selected,endpoint,{[key]:selected.keyframes[endpoint][key]},next));}}
           apiBase={apiBase}
           layer={selected}
           endpoint={endpoint}

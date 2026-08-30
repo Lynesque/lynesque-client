@@ -24,7 +24,7 @@ const messages: Record<Notification['kind'], string> = {
   follow_board: 'made a new Postboard post',
   following_video_comment: 'commented on a video',
   following_board_comment: 'commented on Postboard',
-  asset_removed: 'had one of your assets taken down',
+  asset_changed:'changed an asset used in your content',asset_removed: 'had one of your assets taken down',
   content_removed: 'had some of your content taken down',
   content_mature: 'changed the Mature tag on your video',
   board_content_mature: 'changed the Mature tag on your Postboard post',

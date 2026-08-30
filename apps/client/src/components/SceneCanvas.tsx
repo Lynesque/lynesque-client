@@ -10,6 +10,7 @@ interface Props {
   time: number;
   playing: boolean;
   apiBase: string;
+  forceMuted?: boolean;
   selectedLayerId?: string | null;
   editingEndpoint?: 0 | 1;
   onSelect?: (id: string) => void;
@@ -79,8 +80,9 @@ function TimedAudio({ layer, src, time, playing, volume }: { layer: AssetLayer; 
   return <audio ref={ref} src={src} crossOrigin="anonymous" preload="metadata" />;
 }
 
-export function SceneCanvas({ scene, time, playing, apiBase, selectedLayerId, editingEndpoint = 0, onSelect, onMoveEndpoint }: Props) {
-  const volume = useVolume();
+export function SceneCanvas({ scene, time, playing, apiBase, forceMuted=false, selectedLayerId, editingEndpoint = 0, onSelect, onMoveEndpoint }: Props) {
+  const masterVolume = useVolume();
+  const volume=forceMuted?0:masterVolume;
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLayers = useMemo(() => scene.layers.filter((layer) => time >= layer.start && time <= layer.end), [scene.layers, time]);
 

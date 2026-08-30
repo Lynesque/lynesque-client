@@ -1,3 +1,4 @@
+import { AssetControls } from './AssetControls';
 import { useEffect, useMemo, useState } from 'react';
 import { adminDeleteAsset, createReport, getAssets, mediaUrl } from '../api';
 import type { AssetRecord,User } from '../types';
@@ -57,8 +58,10 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
           {asset.kind === 'image' ? <img src={mediaUrl(apiBase, asset.id)} alt="" loading="lazy" /> : asset.kind === 'video' ? <video src={mediaUrl(apiBase, asset.id)} muted playsInline preload="metadata" /> : <span className="audio-asset">♪</span>}
           <small>{asset.originalName}</small>
           {asset.moderationStatus==='pending'&&<small className="pending-label">Awaiting review</small>}
+          {(asset.mature||asset.safetyMature)&&<small className="mature-label">Mature</small>}
           {asset.visibility==='private'&&<small className="private-label">Private</small>}
         </button>
+        {viewer&&<AssetControls asset={asset} viewer={viewer} apiBase={apiBase} token={token} onChanged={updated=>setAssets(items=>items.map(item=>item.id===updated.id?updated:item))}/>}
         <AdminMenu label={`Options for ${asset.originalName}`} onReport={!isAdmin&&viewer?.id!==asset.uploaderId?async()=>{const reason=window.prompt(`Why are you reporting “${asset.originalName}”?`);if(reason?.trim()){await createReport(apiBase,token,{targetType:'asset',assetId:asset.id,reason});setStatus('Report sent to the admins.');}}:undefined} onDelete={isAdmin?async () => {
           if (!window.confirm(`Delete “${asset.originalName}”? Videos, posts, comments, and avatars using it will also be taken down.`)) return;
           const reason = window.prompt('Reason shown to affected users and saved in the admin log:', 'Removed directly by an admin.');
