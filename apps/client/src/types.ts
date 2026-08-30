@@ -11,6 +11,8 @@ export interface AssetRecord {
   createdAt: string;
   uploaderId?: string;
   moderationStatus?: 'public' | 'pending';
+  visibility?: 'public' | 'private';
+  safetyMature?: boolean;
   uploader?: User;
 }
 
@@ -33,6 +35,9 @@ export interface AssetLayer {
   start: number;
   end: number;
   muted?: boolean;
+  volume?: number;
+  sourceStart?: number;
+  sourceEnd?: number;
   keyframes: [TransformKeyframe, TransformKeyframe];
 }
 
@@ -77,6 +82,9 @@ export interface User {
   hasEmail?: boolean;
   emailVerified?: boolean;
   emailRequired?: boolean;
+  mfaEnabled?: boolean;
+  showMatureContent?: boolean;
+  matureAgeConfirmed?: boolean;
   adminBlockedUntil?: string;
   suspension?: { reason: string; until: string };
 }
@@ -109,7 +117,7 @@ export interface Comment {
   user?: User;
 }
 
-export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_removed'|'content_removed'|'admin_changed'|'report_resolved'|'review_resolved'|'admin_rate_limited'|'automatic_suspension';
+export type NotificationKind = 'post_like'|'post_dislike'|'follow'|'unfollow'|'comment_mention'|'video_mention'|'comment'|'comment_like'|'comment_dislike'|'board_like'|'board_dislike'|'board_comment'|'board_mention'|'board_comment_mention'|'board_comment_like'|'board_comment_dislike'|'follow_video'|'follow_board'|'following_video_comment'|'following_board_comment'|'asset_removed'|'content_removed'|'content_mature'|'board_content_mature'|'admin_changed'|'report_resolved'|'review_resolved'|'admin_rate_limited'|'automatic_suspension';
 export type NotificationPreferences = Record<NotificationKind, boolean>;
 
 export interface Notification {
@@ -149,13 +157,14 @@ export interface Post {
   commentsTotal: number;
   commentsHasMore: boolean;
   moderationStatus?: 'public'|'pending';
+  mature?: boolean;
   createdAt: string;
 }
 
 export interface BoardPost {
   id: string; authorId: string; author: User; text: string; stickerAssetId?: string; sticker?: AssetRecord;
   likes: string[]; dislikes: string[]; likeCount: number; likedByViewer: boolean; dislikedByViewer: boolean;
-  comments: Comment[]; commentsTotal:number;commentsHasMore:boolean;createdAt: string;
+  comments: Comment[]; commentsTotal:number;commentsHasMore:boolean;mature?:boolean;createdAt: string;
 }
 
 export interface Profile {

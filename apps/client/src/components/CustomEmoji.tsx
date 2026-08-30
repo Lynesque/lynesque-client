@@ -17,9 +17,11 @@ export function useCustomEmojis(apiBase:string) {
   return emojis;
 }
 
-export function EmojiButton({apiBase,onInsert,disabled=false}:{apiBase:string;onInsert:(code:string)=>void;disabled?:boolean}){
-  const emojis=useCustomEmojis(apiBase);const [open,setOpen]=useState(false);
-  return <span className="emoji-control"><button type="button" title="Custom emojis" aria-label="Custom emojis" disabled={disabled||emojis.length===0} className={open?'active emoji-toggle':'emoji-toggle'} onClick={()=>setOpen(!open)}>😀</button>{open&&<span className="emoji-picker panel">{emojis.map((name)=><button type="button" key={name} title={`:${name}:`} onClick={()=>{onInsert(`:${name}:`);setOpen(false);}}><img src={emojiUrl(apiBase,name)} alt={`:${name}:`} loading="lazy"/></button>)}</span>}</span>;
+export function EmojiButton({apiBase,onInsert,disabled=false,placement='down'}:{apiBase:string;onInsert:(code:string)=>void;disabled?:boolean;placement?:'up'|'down'}){
+  const emojis=useCustomEmojis(apiBase);const [open,setOpen]=useState(false);const [icon,setIcon]=useState('');
+  const randomIcon=()=>setIcon((current)=>{if(!emojis.length)return '';if(emojis.length===1)return emojis[0];let next=current;while(next===current)next=emojis[Math.floor(Math.random()*emojis.length)];return next;});
+  useEffect(()=>{if(emojis.length&&!icon)randomIcon();},[emojis,icon]);
+  return <span className={`emoji-control emoji-${placement}`}><button type="button" title="Custom emojis" aria-label="Custom emojis" disabled={disabled||emojis.length===0} className={open?'active emoji-toggle':'emoji-toggle'} onClick={()=>{setOpen(!open);randomIcon();}}>{icon?<img src={emojiUrl(apiBase,icon)} alt="Custom emoji picker"/>:'◇'}</button>{open&&<span className="emoji-picker panel">{emojis.map((name)=><button type="button" key={name} title={`:${name}:`} onClick={()=>{onInsert(`:${name}:`);setOpen(false);randomIcon();}}><img src={emojiUrl(apiBase,name)} alt={`:${name}:`} loading="lazy"/></button>)}</span>}</span>;
 }
 
 export function RichText({apiBase,text,onHash}:{apiBase:string;text:string;onHash?:(tag:string)=>void}){

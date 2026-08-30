@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addComment, adminDeleteComment, adminDeletePost, createReport, deleteComment, deletePost, getComments, getFeed, getPost, mediaUrl, runShitTok, searchVideos, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
+import { addComment, adminDeleteComment, adminDeletePost, adminSetPostMature, createReport, deleteComment, deletePost, getComments, getFeed, getPost, mediaUrl, runShitTok, searchVideos, toggleCommentReaction, toggleDislike, toggleFollow, toggleLike } from '../api';
 import { useTimeline } from '../useTimeline';
 import type { AssetRecord, Post, User } from '../types';
 import { SceneCanvas } from './SceneCanvas';
@@ -36,9 +36,9 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
             onPost({ ...post, author: user });
           }}>{post.author.followedByViewer ? 'Following' : 'Follow'}</button>}
         </div>
-        <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span><AdminMenu label="Video options" onDelete={canModerate||post.authorId===viewer.id?deleteVideo:undefined} onReport={!canModerate&&post.authorId!==viewer.id?()=>report({targetType:'post',postId:post.id,reason:''}):undefined}/></div>
+        <div className="post-head-actions"><span>{new Date(post.createdAt).toLocaleString()}</span><AdminMenu label="Video options" mature={post.mature} onMature={canModerate?async()=>onPost((await adminSetPostMature(apiBase,token,post.id,!post.mature)).post):undefined} onDelete={canModerate||post.authorId===viewer.id?deleteVideo:undefined} onReport={!canModerate&&post.authorId!==viewer.id?()=>report({targetType:'post',postId:post.id,reason:''}):undefined}/></div>
       </div>
-      <div className="video-title-row"><h2 className="video-post-title"><RichText apiBase={apiBase} text={post.title} onHash={onHash}/></h2><code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
+      <div className="video-title-row"><h2 className="video-post-title"><RichText apiBase={apiBase} text={post.title} onHash={onHash}/></h2>{post.mature&&<span className="mature-label">Mature</span>}<code title="Search this reference to find the video">{reference}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}catch{window.prompt('Copy this video link:',shareUrl);}}}>{copied?'Copied':'Copy link'}</button></div>
       <div className="feed-scene" onClick={() => timeline.setPlaying(!timeline.playing)}>
         <SceneCanvas scene={post.scene} time={timeline.time} playing={timeline.playing} apiBase={apiBase} />
         {!timeline.playing && <div className="play-overlay">▶</div>}
@@ -84,7 +84,7 @@ function FeedPost({ apiBase, token, viewer, post, commentsVisible, setCommentsVi
         }
       }}>
         {sticker && <div className="selected-sticker"><img src={mediaUrl(apiBase, sticker.id)} alt="Selected sticker" /><button type="button" onClick={() => setSticker(null)}>Remove</button></div>}
-        <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><EmojiButton apiBase={apiBase} onInsert={(code)=>setComment((value)=>(value+code).slice(0,500))}/><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
+        <div className="comment-compose"><input value={comment} maxLength={500} placeholder="Add a comment" onChange={(event) => setComment(event.target.value)} /><EmojiButton apiBase={apiBase} placement="up" onInsert={(code)=>setComment((value)=>(value+code).slice(0,500))}/><button type="button" className={stickersVisible ? 'active' : ''} onClick={() => setStickersVisible((visible) => !visible)}>Sticker</button><button>Comment</button></div>
       </form>
       {stickersVisible && <AssetLibrary apiBase={apiBase} token={token} viewer={viewer} isAdmin={canModerate} sections={['image', 'gif']} title="Stickers" selectedId={sticker?.id} onSelect={(asset) => setSticker(asset)} />}
     </aside>}

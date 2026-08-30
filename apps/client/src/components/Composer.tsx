@@ -35,6 +35,8 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
   const [status, setStatus] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(false);
   const [title, setTitle] = useState('');
+  const [privateUploads,setPrivateUploads]=useState(false);
+  const [mature,setMature]=useState(false);
   const [settingsSuggested,setSettingsSuggested]=useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const timeline = useTimeline(7);
@@ -90,10 +92,10 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
       if (!displayName.trim()) { setStatus(`${file.name} was skipped because its name was empty.`); continue; }
       setStatus(`Uploading ${displayName.trim()}...`);
       try {
-        const { asset, deduplicated,pending,message } = await uploadAsset(apiBase, token, file, displayName.trim());
+        const { asset, deduplicated,pending,message } = await uploadAsset(apiBase, token, file, displayName.trim(),privateUploads?'private':'public');
         if (!addAssetLayer(asset)) break;
         assetCount += 1;
-        setStatus(message||(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : pending?`${displayName.trim()} is awaiting admin review.`:`${displayName.trim()} uploaded.`));
+        setStatus(message||(deduplicated ? `${displayName.trim()} already existed; reused the stored copy.` : pending?`${displayName.trim()} is awaiting the site moderation system.`:`${displayName.trim()} uploaded.`));
       } catch (error) {
         setSettingsSuggested(error instanceof ApiError&&error.settingsLink===true);
         setStatus(error instanceof Error ? error.message : 'Upload failed.');
@@ -143,10 +145,11 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
     if (!scene.layers.length) return setStatus('Put something in the video first.');
     setStatus('Posting...');
     try {
-      const result=await createPost(apiBase, token, scene, title || 'New Video');
+      const result=await createPost(apiBase, token, scene, title || 'New Video',mature);
       setStatus(result.message||(result.pending?'Video sent for admin review.':'Video published.'));
       setScene({ version: 1, duration: 7, background: '#000000', layers: [] });
       setTitle('');
+      setMature(false);
       setSelectedId(null);
       timeline.seek(0);
       timeline.setPlaying(false);
@@ -159,12 +162,14 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
   return (
     <div className="composer-layout">
       <section className="composer-left panel">
-        {user.accountStatus==='unverified'&&<div className="review-notice">Your account is unverified. Assets and videos you upload are private and sent to admins for review. Approval makes an item public but does not automatically change your account; denial deletes that reviewed item.</div>}
+        {user.accountStatus==='unverified'&&<div className="review-notice">Your account is unverified. Assets and videos you upload stay private while they pass through the site moderation system. Approval makes an item public but does not automatically change your account; denial deletes that reviewed item.</div>}
         <div className="composer-toolbar">
           <input ref={fileInput} hidden multiple type="file" accept="image/*,video/*,audio/*" onChange={(e) => onFiles(e.target.files)} />
           <button onClick={() => fileInput.current?.click()}>Add media</button>
           <button className={libraryVisible ? 'active' : ''} onClick={() => setLibraryVisible((visible) => !visible)}>Library</button>
           <button onClick={addText}>Add text</button>
+          <label className="check compact-check"><input type="checkbox" checked={privateUploads} onChange={(event)=>setPrivateUploads(event.target.checked)}/> New uploads private</label>
+          <label className="check compact-check"><input type="checkbox" checked={mature} onChange={(event)=>setMature(event.target.checked)}/> Mature video</label>
           <span className="asset-count">Assets {scene.layers.filter((layer)=>layer.kind==='asset').length}/{MAX_ASSET_LAYERS}</span>
           <label className="background">BG <input type="color" value={scene.background || '#000000'} onChange={(e) => setScene((current) => ({ ...current, background: e.target.value }))} /></label>
           <span className="field-with-emoji video-title-field"><input className="video-title" value={title} maxLength={180} onChange={(event) => setTitle(event.target.value)} placeholder="Video title — #hashtags and @people work" /><EmojiButton apiBase={apiBase} onInsert={(code)=>setTitle((value)=>(value+code).slice(0,180))}/></span>
@@ -204,7 +209,7 @@ export function Composer({ apiBase, token, user, onPosted,onSettings }: Props) {
       </section>
 
       <aside className="panel composer-right">
-        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={isAdminUser(user)} viewer={user} allowPending sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
+        {libraryVisible && <AssetLibrary apiBase={apiBase} token={token} isAdmin={isAdminUser(user)} viewer={user} allowPending allowPrivate sections={['image', 'gif', 'video', 'audio']} title="Saved assets" onSelect={(asset) => { if(addAssetLayer(asset))setStatus(`${asset.originalName} added from the library.`); }} />}
         <h3>Layers</h3>
         <div className="layer-list">
           {[...hydratedScene.layers].reverse().map((layer) => {

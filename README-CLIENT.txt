@@ -37,3 +37,9 @@ CURRENT UPDATE
 - Automatic lyneque.com/lynesque.com connection with no server field.
 - Notification and comments drawers, including comment reactions/timestamps.
 - Image/GIF comment stickers and a saved-asset creator library.
+- Optional email MFA and one-account-per-email verification.
+- Mature tags, adult-only visibility settings, and admin Mature-tag notices.
+- Private creator assets that stay out of the shared library and stickers.
+- Per-layer volume/source trimming and persistent transform-sync toggles.
+- Public Rules, Terms, Privacy, minimum-age, and abuse/takedown pages.
+- Safer blurred moderation previews and separate resolved-report history.

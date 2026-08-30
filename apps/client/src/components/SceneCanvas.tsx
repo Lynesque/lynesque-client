@@ -39,17 +39,20 @@ function TimedVideo({ layer, src, time, playing, volume }: { layer: AssetLayer; 
     const el = ref.current;
     if (!el) return;
     limitMedia(el);
-    el.volume = volume;
+    el.volume = Math.max(0,Math.min(1,volume*(layer.volume??1)));
     const local = Math.max(0, time - layer.start);
     const duration = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
-    const desired = duration ? local % duration : local;
+    const sourceStart=Math.min(duration||86_400,Math.max(0,layer.sourceStart??0));
+    const sourceEnd=Math.min(duration||86_400,Math.max(sourceStart,layer.sourceEnd??(duration||86_400)));
+    const sourceDuration=Math.max(.05,sourceEnd-sourceStart);
+    const desired=sourceStart+(local%sourceDuration);
     if (Math.abs((el.currentTime || 0) - desired) > 0.2) {
       try { el.currentTime = desired; } catch (_) {}
     }
     el.muted = Boolean(layer.muted);
     if (playing) { resumeLimitedAudio(); el.play().catch(() => {}); }
     else el.pause();
-  }, [time, playing, layer.start, layer.muted, volume]);
+  }, [time, playing, layer.start, layer.muted, layer.volume,layer.sourceStart,layer.sourceEnd,volume]);
   return <video ref={ref} src={src} crossOrigin="anonymous" playsInline preload="metadata" />;
 }
 
@@ -59,17 +62,20 @@ function TimedAudio({ layer, src, time, playing, volume }: { layer: AssetLayer; 
     const el = ref.current;
     if (!el) return;
     limitMedia(el);
-    el.volume = volume;
+    el.volume = Math.max(0,Math.min(1,volume*(layer.volume??1)));
     const active = time >= layer.start && time <= layer.end;
     const local = Math.max(0, time - layer.start);
     const duration = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
-    const desired = duration ? local % duration : local;
+    const sourceStart=Math.min(duration||86_400,Math.max(0,layer.sourceStart??0));
+    const sourceEnd=Math.min(duration||86_400,Math.max(sourceStart,layer.sourceEnd??(duration||86_400)));
+    const sourceDuration=Math.max(.05,sourceEnd-sourceStart);
+    const desired=sourceStart+(local%sourceDuration);
     if (Math.abs((el.currentTime || 0) - desired) > 0.2) {
       try { el.currentTime = desired; } catch (_) {}
     }
     if (playing && active) { resumeLimitedAudio(); el.play().catch(() => {}); }
     else el.pause();
-  }, [time, playing, layer.start, layer.end, volume]);
+  }, [time, playing, layer.start, layer.end,layer.volume,layer.sourceStart,layer.sourceEnd, volume]);
   return <audio ref={ref} src={src} crossOrigin="anonymous" preload="metadata" />;
 }
 

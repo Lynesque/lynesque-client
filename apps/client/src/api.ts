@@ -35,17 +35,21 @@ const authHeaders = (token: string, json = false) => ({
   ...(json ? { 'Content-Type': 'application/json' } : {})
 });
 
+export type SessionResult={user:User;token:string;mediaToken:string};
+export type LoginResult=SessionResult|{mfaRequired:true;challengeId:string;message:string};
+
 export async function register(apiBase: string, username: string, password: string) {
   return parse<{ user: User; token: string;mediaToken:string }>(await fetch(`${apiBase}/api/auth/register`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password,acceptedPolicies:true })
   }));
 }
 
 export async function login(apiBase: string, username: string, password: string) {
-  return parse<{ user: User; token: string;mediaToken:string }>(await fetch(`${apiBase}/api/auth/login`, {
+  return parse<LoginResult>(await fetch(`${apiBase}/api/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
   }));
 }
+export async function completeMfa(apiBase:string,challengeId:string,code:string){return parse<SessionResult>(await fetch(`${apiBase}/api/auth/mfa`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challengeId,code})}));}
 
 export async function currentUser(apiBase: string, token: string) {
   return parse<{ user: User }>(await fetch(`${apiBase}/api/auth/me`, { headers: authHeaders(token) }));
@@ -61,9 +65,9 @@ export async function beginPatreonLink(apiBase:string,token:string){return parse
 export async function refreshPatreonLink(apiBase:string,token:string){return parse<{user:User;entitled:boolean}>(await fetch(`${apiBase}/api/integrations/patreon/refresh`,{method:'POST',headers:authHeaders(token)}));}
 export async function unlinkPatreon(apiBase:string,token:string){return parse<{user:User}>(await fetch(`${apiBase}/api/integrations/patreon`,{method:'DELETE',headers:authHeaders(token)}));}
 
-export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name) {
+export async function uploadAsset(apiBase: string, token: string, file: File, displayName = file.name,visibility:'public'|'private'='public') {
   return parse<{ asset: AssetRecord; deduplicated: boolean;pending?:boolean;message?:string }>(await fetch(`${apiBase}/api/assets`, {
-    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(displayName) }, body: file
+    method: 'POST', headers: { ...authHeaders(token), 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(displayName),'X-Asset-Visibility':visibility }, body: file
   }));
 }
 
@@ -80,14 +84,14 @@ export async function getPost(apiBase: string, token: string, postId: string) {
 }
 export async function deletePost(apiBase:string,token:string,postId:string){return parse<{ok:boolean}>(await fetch(`${apiBase}/api/posts/${encodeURIComponent(postId)}`,{method:'DELETE',headers:authHeaders(token)}));}
 
-export async function createPost(apiBase: string, token: string, scene: Scene, title = 'New Video') {
+export async function createPost(apiBase: string, token: string, scene: Scene, title = 'New Video',mature=false) {
   return parse<{ post: Post;pending?:boolean;message?:string }>(await fetch(`${apiBase}/api/posts`, {
-    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ scene, title })
+    method: 'POST', headers: authHeaders(token, true), body: JSON.stringify({ scene, title,mature })
   }));
 }
 export async function searchVideos(apiBase: string, token: string, query: string,offset=0,limit=1) { return parse<{ posts: Post[];offset:number;total:number;hasMore:boolean }>(await fetch(`${apiBase}/api/search/videos?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`, { headers: authHeaders(token) })); }
 export async function getBoardPosts(apiBase: string, token: string,offset=0,limit=20) { return parse<{ posts: BoardPost[];offset:number;total:number;hasMore:boolean }>(await fetch(`${apiBase}/api/postboard?offset=${offset}&limit=${limit}`, { headers: authHeaders(token) })); }
-export async function createBoardPost(apiBase: string, token: string, text: string, stickerAssetId?: string) { return parse<{ post: BoardPost }>(await fetch(`${apiBase}/api/postboard`, {method:'POST',headers:authHeaders(token,true),body:JSON.stringify({text,stickerAssetId})})); }
+export async function createBoardPost(apiBase: string, token: string, text: string, stickerAssetId?: string,mature=false) { return parse<{ post: BoardPost }>(await fetch(`${apiBase}/api/postboard`, {method:'POST',headers:authHeaders(token,true),body:JSON.stringify({text,stickerAssetId,mature})})); }
 export async function toggleBoardReaction(apiBase:string,token:string,id:string,reaction:'like'|'dislike'){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/postboard/${id}/${reaction}`,{method:'POST',headers:authHeaders(token)}));}
 export async function addBoardComment(apiBase:string,token:string,id:string,text:string,stickerAssetId?:string){return parse<{comment:unknown}>(await fetch(`${apiBase}/api/postboard/${id}/comments`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({text,stickerAssetId})}));}
 export async function toggleBoardCommentReaction(apiBase:string,token:string,id:string,commentId:string,reaction:'like'|'dislike'){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/postboard/${id}/comments/${commentId}/${reaction}`,{method:'POST',headers:authHeaders(token)}));}
@@ -133,10 +137,13 @@ export async function clearNotifications(apiBase:string,token:string){return par
 export async function getNotificationSettings(apiBase:string,token:string){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{headers:authHeaders(token)}));}
 export async function setNotificationSettings(apiBase:string,token:string,preferences:NotificationPreferences){return parse<{preferences:NotificationPreferences}>(await fetch(`${apiBase}/api/settings/notifications`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({preferences})}));}
 export async function requestEmailVerification(apiBase:string,token:string,email:string){return parse<{ok?:boolean;message?:string;alreadyVerified?:boolean;user?:User}>(await fetch(`${apiBase}/api/settings/email`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({email})}));}
+export async function setMfa(apiBase:string,token:string,enabled:boolean,password:string){return parse<{user:User;message:string}>(await fetch(`${apiBase}/api/settings/mfa`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled,password})}));}
+export async function setMatureContent(apiBase:string,token:string,enabled:boolean,confirmAdult=false){return parse<{user:User}>(await fetch(`${apiBase}/api/settings/mature-content`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled,confirmAdult})}));}
+export async function getPublicConfig(apiBase:string){return parse<{policyVersion:string;minimumAge:number;matureMinimumAge:number;abuseContactEmail:string;takedownContactEmail:string}>(await fetch(`${apiBase}/api/public-config`));}
 export async function getEmojis(apiBase:string){return parse<{emojis:string[]}>(await fetch(`${apiBase}/api/emojis`));}
 export async function setEmojiBadge(apiBase:string,token:string,name?:string){return parse<{user:User}>(await fetch(`${apiBase}/api/settings/emoji-badge`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({name:name||''})}));}
 export async function createReport(apiBase:string,token:string,input:{targetType:import('./types').ReportTargetType;username?:string;assetId?:string;postId?:string;boardPostId?:string;commentId?:string;reason:string}){return parse<{report:Report}>(await fetch(`${apiBase}/api/reports`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify(input)}));}
-export async function getAdminOverview(apiBase:string,token:string,limit=30){return parse<{reports:Report[];suspensions:Suspension[];logs:AdminLog[];pendingAssets:AssetRecord[];pendingPosts:Post[];hasMore:Record<string,boolean>}>(await fetch(`${apiBase}/api/admin/overview?limit=${limit}`,{headers:authHeaders(token)}));}
+export async function getAdminOverview(apiBase:string,token:string,limit=30){return parse<{reports:Report[];resolvedReports:Report[];suspensions:Suspension[];logs:AdminLog[];pendingAssets:AssetRecord[];pendingPosts:Post[];retention:{resolvedReportsDays:number;adminLogsDays:number};hasMore:Record<string,boolean>}>(await fetch(`${apiBase}/api/admin/overview?limit=${limit}`,{headers:authHeaders(token)}));}
 export async function setAdminRole(apiBase:string,token:string,userId:string,enabled:boolean){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/admin`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({enabled})}));}
 export async function setAccountStatus(apiBase:string,token:string,userId:string,status:import('./types').AccountStatus,allowWithoutVerifiedEmail=false){return parse<{user:User}>(await fetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/status`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({status,allowWithoutVerifiedEmail})}));}
 export async function resolvePending(apiBase:string,token:string,type:'asset'|'post',id:string,decision:'accepted'|'denied',reason=''){return parse<{decision:'accepted'|'denied';uploaderId?:string;uploader?:User;pendingReviewCount:number;offerDefault:boolean;asset?:AssetRecord;post?:Post}>(await fetch(`${apiBase}/api/admin/review/${type}/${encodeURIComponent(id)}`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({decision,reason})}));}
@@ -150,6 +157,8 @@ export const adminDeletePost=(apiBase:string,token:string,id:string,reason:strin
 export const adminDeleteComment=(apiBase:string,token:string,postId:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(id)}`,reason);
 export const adminDeleteBoardPost=(apiBase:string,token:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(id)}`,reason);
 export const adminDeleteBoardComment=(apiBase:string,token:string,postId:string,id:string,reason:string)=>adminDelete(apiBase,token,`/api/admin/postboard/${encodeURIComponent(postId)}/comments/${encodeURIComponent(id)}`,reason);
+export async function adminSetPostMature(apiBase:string,token:string,id:string,mature:boolean){return parse<{post:Post}>(await fetch(`${apiBase}/api/admin/posts/${encodeURIComponent(id)}/mature`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({mature})}));}
+export async function adminSetBoardPostMature(apiBase:string,token:string,id:string,mature:boolean){return parse<{post:BoardPost}>(await fetch(`${apiBase}/api/admin/postboard/${encodeURIComponent(id)}/mature`,{method:'POST',headers:authHeaders(token,true),body:JSON.stringify({mature})}));}
 
 export async function getProfile(apiBase: string, token: string, userId: string,offset=0,limit=20,section:'videos'|'assets'|'postboard'='videos') {
   return parse<Profile>(await fetch(`${apiBase}/api/users/${encodeURIComponent(userId)}/profile?offset=${offset}&limit=${limit}&section=${section}`, { headers: authHeaders(token) }));

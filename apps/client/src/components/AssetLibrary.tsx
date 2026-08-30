@@ -10,7 +10,7 @@ export const assetSection = (asset: AssetRecord): AssetSection => {
   return asset.kind;
 };
 
-export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, title = 'Library', isAdmin = false,viewer,allowPending=false }: {
+export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, title = 'Library', isAdmin = false,viewer,allowPending=false,allowPrivate=false }: {
   apiBase: string;
   token: string;
   sections: AssetSection[];
@@ -20,6 +20,7 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
   isAdmin?: boolean;
   viewer?:User;
   allowPending?:boolean;
+  allowPrivate?:boolean;
 }) {
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [section, setSection] = useState<AssetSection>(sections[0]);
@@ -39,7 +40,7 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
     return () => { active = false;window.clearTimeout(timer); };
   }, [apiBase, token,query,section]);
 
-  const visible = useMemo(() => assets.filter((asset) => assetSection(asset) === section&&(allowPending||asset.moderationStatus!=='pending')), [assets, section,allowPending]);
+  const visible = useMemo(() => assets.filter((asset) => assetSection(asset) === section&&(allowPending||asset.moderationStatus!=='pending')&&(allowPrivate||asset.visibility!=='private')), [assets, section,allowPending,allowPrivate]);
   const more=async()=>{if(!hasMore||loadingMore)return;setLoadingMore(true);try{const result=await getAssets(apiBase,token,assets.length,36,query,section);setAssets((items)=>[...items,...result.assets.filter((asset)=>!items.some((item)=>item.id===asset.id))]);setHasMore(result.hasMore);}finally{setLoadingMore(false);}};
 
   return <section className="asset-library">
@@ -56,6 +57,7 @@ export function AssetLibrary({ apiBase, token, sections, onSelect, selectedId, t
           {asset.kind === 'image' ? <img src={mediaUrl(apiBase, asset.id)} alt="" loading="lazy" /> : asset.kind === 'video' ? <video src={mediaUrl(apiBase, asset.id)} muted playsInline preload="metadata" /> : <span className="audio-asset">♪</span>}
           <small>{asset.originalName}</small>
           {asset.moderationStatus==='pending'&&<small className="pending-label">Awaiting review</small>}
+          {asset.visibility==='private'&&<small className="private-label">Private</small>}
         </button>
         <AdminMenu label={`Options for ${asset.originalName}`} onReport={!isAdmin&&viewer?.id!==asset.uploaderId?async()=>{const reason=window.prompt(`Why are you reporting “${asset.originalName}”?`);if(reason?.trim()){await createReport(apiBase,token,{targetType:'asset',assetId:asset.id,reason});setStatus('Report sent to the admins.');}}:undefined} onDelete={isAdmin?async () => {
           if (!window.confirm(`Delete “${asset.originalName}”? Videos, posts, comments, and avatars using it will also be taken down.`)) return;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currentUser, getBoardNotifications, getMediaAccess, getNotifications, login, logout, register, requestEmailVerification, resolveApiBase, setMediaAccessToken } from './api';
+import { completeMfa, currentUser, getBoardNotifications, getMediaAccess, getNotifications, login, logout, register, requestEmailVerification, resolveApiBase, setMediaAccessToken } from './api';
 import { Composer } from './components/Composer';
 import { Feed } from './components/Feed';
 import { ProfileView } from './components/ProfileView';
@@ -11,8 +11,9 @@ import { VolumeContext } from './volume';
 import { UserAvatar, UserName } from './components/UserIdentity';
 import { applyTheme } from './theme';
 import { isAdminUser } from './permissions';
+import { Policies } from './components/Policies';
 
-type Tab = 'feed' | 'create' | 'profile' | 'postboard' | 'settings' | 'admin';
+type Tab = 'feed' | 'create' | 'profile' | 'postboard' | 'settings' | 'admin' | 'policies';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('feed');
@@ -82,6 +83,7 @@ export default function App() {
   };
 
   if (!apiBase) return <div className="auth-page"><div className="auth-panel panel">Connecting to Lynesque…</div></div>;
+  if(window.location.pathname==='/policies')return <Policies apiBase={apiBase}/>;
   if (!user || !token) {
     return <AuthScreen apiBase={apiBase} status={status} setStatus={setStatus} onSession={acceptSession} />;
   }
@@ -111,7 +113,6 @@ export default function App() {
             }} />
           </label>
           <button className="user-link topbar-user" onClick={() => openProfile(user.id)}><UserAvatar apiBase={apiBase} user={user} small/><UserName apiBase={apiBase} compact user={user}/></button>
-          <button onClick={signOut}>Log out</button>
         </div>
       </header>
 
@@ -121,11 +122,12 @@ export default function App() {
         {tab === 'create' && <Composer apiBase={apiBase} token={token} user={user} onSettings={()=>setTab('settings')} onPosted={(pending) => { setRefreshToken((n) => n + 1); if(!pending)setTab('feed'); }} />}
         {tab === 'postboard' && <Postboard apiBase={apiBase} token={token} user={user} onUnreadCount={setBoardUnreadCount} onProfile={openProfile} onSearch={(tag) => { setFeedPostId(undefined); setTab('feed'); localStorage.setItem('lynesque-search', tag); }} />}
         {tab === 'profile' && <ProfileView apiBase={apiBase} token={token} viewer={user} userId={profileId || user.id} onSettings={()=>setTab('settings')} onUserChanged={(next) => setUser(next)} onProfile={openProfile} onOpenPost={openFeedPost} />}
-        {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user} onUserChanged={setUser}/>}
+        {tab==='settings'&&<Settings apiBase={apiBase} token={token} user={user} onUserChanged={setUser} onLogout={signOut} onPolicies={()=>setTab('policies')}/>}
         {tab==='admin'&&isAdminUser(user)&&<Admin apiBase={apiBase} token={token} user={user} onProfile={openProfile}/>}
+        {tab==='policies'&&<Policies apiBase={apiBase} onBack={()=>setTab('settings')}/>}
       </main>
       {user.suspension&&!suspensionAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account suspended</h2><p>You can browse, but interactive features are disabled until <strong>{new Date(user.suspension.until).toLocaleString()}</strong>.</p><p><strong>Reason:</strong> {user.suspension.reason}</p><button onClick={()=>setSuspensionAcknowledged(true)}>I understand</button></section></div>}
-      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private until an admin reviews them, profile pictures are disabled, and you cannot publish on Postboard yet. Video uploads have a shared three-hour publishing cooldown.</p><p>Approved uploads become public, but your account stays unverified unless an admin separately changes it to default or verified. New accounts should verify an email before routine promotion; a denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
+      {!user.suspension&&user.accountStatus==='unverified'&&!unverifiedAcknowledged&&<div className="modal-backdrop"><section className="suspension-modal panel"><h2>Account unverified</h2><p>You can browse, react, follow, comment, and reply normally. New assets and videos are private while they pass through the site moderation system, profile pictures are disabled, and you cannot publish on Postboard yet. Video uploads have a shared three-hour publishing cooldown.</p><p>Approved uploads become public, but your account stays unverified unless the moderation system separately changes it to default or verified. New accounts should verify an email before routine promotion; a denied upload is deleted and you receive a notification.</p><button onClick={()=>setUnverifiedAcknowledged(true)}>I understand</button></section></div>}
     </div>
     </VolumeContext.Provider>
   );
@@ -139,11 +141,18 @@ function AuthScreen({ apiBase, status, setStatus, onSession }: {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email,setEmail]=useState('');
+  const [mfaChallenge,setMfaChallenge]=useState('');
+  const [mfaCode,setMfaCode]=useState('');
+  const [acceptedPolicies,setAcceptedPolicies]=useState(false);
+  const policyHref=window.location.protocol==='file:'?'https://lyneque.com/policies':'/policies';
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setStatus(mode === 'login' ? 'Signing in...' : 'Creating account...');
     try {
+      if(mfaChallenge){const result=await completeMfa(apiBase,mfaChallenge,mfaCode);onSession(result.user,result.token,result.mediaToken);setStatus('');return;}
+      if(mode==='register'&&!acceptedPolicies){setStatus('Confirm the age requirement and accept the Lynesque policies first.');return;}
       const result = mode === 'login' ? await login(apiBase, username, password) : await register(apiBase, username, password);
+      if('mfaRequired' in result){setMfaChallenge(result.challengeId);setPassword('');setStatus(result.message);return;}
       onSession(result.user, result.token,result.mediaToken);
       if(mode==='register'&&email.trim()){try{const sent=await requestEmailVerification(apiBase,result.token,email.trim());setStatus(sent.message||'Account created. Check your email for the verification link.');}catch(error){setStatus(`Account created, but email verification was not sent: ${error instanceof Error?error.message:'unknown error'}`);}}else setStatus('');
     } catch (error) {
@@ -155,15 +164,18 @@ function AuthScreen({ apiBase, status, setStatus, onSession }: {
     <div className="auth-page">
       <form className="auth-panel panel" onSubmit={submit}>
         <div className="brand auth-brand">lynesque.com <small>totally better than</small></div>
-        <h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
+        <h2>{mfaChallenge?'Email verification code':mode === 'login' ? 'Sign in' : 'Create account'}</h2>
+        {mfaChallenge?<><p>Enter the six-digit code sent to your verified email.</p><label>Sign-in code<input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(event)=>setMfaCode(event.target.value.replace(/\D/g,''))}/></label></>:<>
         <label>Username<input autoFocus value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
-        {mode==='register'&&<><small>New passwords must be at least 10 characters.</small><label>Email (recommended for account approval)<input type="email" value={email} onChange={(event)=>setEmail(event.target.value)} autoComplete="email" placeholder="Used for verification"/></label></>}
+        {mode==='register'&&<><small>New passwords must be at least 10 characters.</small><label>Email (recommended for account approval)<input type="email" value={email} onChange={(event)=>setEmail(event.target.value)} autoComplete="email" placeholder="Used for verification and optional MFA"/></label><label className="check policy-consent"><input type="checkbox" checked={acceptedPolicies} onChange={(event)=>setAcceptedPolicies(event.target.checked)}/> I am at least 16 and agree to the <a href={policyHref} target="_blank">Terms, Privacy Policy, Community Rules, and age policy</a>.</label></>}
+        </>}
         {status && <div className="status">{status}</div>}
-        <button className="primary" type="submit">{mode === 'login' ? 'Sign in' : 'Create account'}</button>
-        <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setStatus(''); }}>
+        <button className="primary" type="submit">{mfaChallenge?'Verify and sign in':mode === 'login' ? 'Sign in' : 'Create account'}</button>
+        {mfaChallenge?<button type="button" onClick={()=>{setMfaChallenge('');setMfaCode('');setStatus('');}}>Start sign-in again</button>:<button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setStatus(''); }}>
           {mode === 'login' ? 'Create an account' : 'Use an existing account'}
-        </button>
+        </button>}
+        <a className="policy-link" href={policyHref} target="_blank">Policies and abuse contact</a>
       </form>
     </div>
   );
